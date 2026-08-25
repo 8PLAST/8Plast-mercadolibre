@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+mercadolibre_config.json
+mercadolibre_secure.dat
+.env
+.venv/
+webhook_server/*.db
+webhook_server/__pycache__/
+8plast_stock.db
+8plast_stock_*.db
+8plast_stock.db-wal
+8plast_stock.db-shm

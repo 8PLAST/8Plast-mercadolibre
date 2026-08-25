@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: 8plast-mercadolibre-webhook
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --chdir webhook_server --workers 1 --threads 4 --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: WEBHOOK_DATABASE_PATH
+        value: /var/data/8plast_stock.db
+    disk:
+      name: webhook-data
+      mountPath: /var/data
+      sizeGB: 1
