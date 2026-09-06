@@ -1,0 +1,26 @@
+{% from "_icons.html" import icon %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% if page != 'management' %}<meta http-equiv="refresh" content="60">{% endif %}
+  <title>8PLAST STOCK · Consulta</title>
+  <link rel="stylesheet" href="{{ url_for('static',filename='portal.css',v='20260829-phase32') }}">
+  <script defer src="{{ url_for('static',filename='portal.js') }}"></script>
+</head>
+<body>
+  <div class="app-shell"><aside><div class="brand"><strong>8PLAST</strong><small>GESTIÓN DE STOCK</small></div><nav>
+    <a class="{{ 'active' if page=='dashboard' }}" href="/">{{ icon('layout-dashboard','nav-icon') }}Inicio</a>
+    <a class="{{ 'active' if page=='bags' }}" href="/bolsas">{{ icon('package','nav-icon') }}Bolsas</a>
+    <a class="{{ 'active' if page=='rolls' }}" href="/rollos">{{ icon('package-open','nav-icon') }}Rollos</a>
+    <a class="{{ 'active' if page=='replenishment' }}" href="/reposicion">{{ icon('triangle-alert','nav-icon') }}Reposición</a>
+    <a class="{{ 'active' if page=='movements' }}" href="/movimientos">{{ icon('history','nav-icon') }}Movimientos</a>
+    <a class="{{ 'active' if page=='marketplace' }}" href="/mercadolibre">{{ icon('store','nav-icon') }}Mercado Libre</a>
+    <a class="{{ 'active' if page=='statistics' }}" href="/estadisticas">{{ icon('chart','nav-icon') }}Estadísticas</a>
+    {% if cloud_portal %}<a href="/gestion">Gestionar inventario</a>{% endif %}
+  </nav><p>{% if cloud_portal %}Gestión en la nube{% else %}Consulta remota<br>Solo lectura{% endif %}</p></aside>
+  <div class="workspace"><header><div><strong>{{ {'dashboard':'Panel principal','bags':'Bolsas','rolls':'Rollos','replenishment':'Plan de producción','movements':'Movimientos y ventas','marketplace':'Mercado Libre','statistics':'Estadísticas','history':'Historial del producto'}[page] }}</strong><span>{{ {'dashboard':'Resumen general del inventario','bags':'Inventario físico, niveles y disponibilidad','rolls':'Inventario físico, niveles y disponibilidad','replenishment':'Qué conviene fabricar primero según stock y ventas reales','movements':'Historial auditable de entradas y salidas','marketplace':'Ventas, cobertura y vinculaciones reales','statistics':'Análisis de ventas y rotación','history':'Trazabilidad individual de stock'}[page] }}</span></div><button type="button" id="refresh">{{ icon('refresh-cw','button-icon') }}Actualizar</button></header>
+  <main>{% if cloud_portal %}{% for message in get_flashed_messages() %}<p role="status">{{ message }}</p>{% endfor %}{% endif %}{% block content %}{% endblock %}</main>
+  <footer><span>8PLAST STOCK · acceso protegido</span><span id="updated"></span></footer></div></div>
+</body></html>

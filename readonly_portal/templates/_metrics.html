@@ -1,0 +1,7 @@
+{% from "_icons.html" import icon %}
+<section class="metrics">
+  <article class="metric ok"><div><i>{{ icon('check-circle') }}</i><span>PRODUCTOS OK</span></div><strong>{{ counts.ok or 0 }}</strong><b></b></article>
+  <article class="metric low"><div><i>{{ icon('triangle-alert') }}</i><span>STOCK BAJO</span></div><strong>{{ counts.low or 0 }}</strong><b></b></article>
+  <article class="metric replenish"><div><i>{{ icon('circle-alert') }}</i><span>REPONER</span></div><strong>{{ counts.replenish or 0 }}</strong><b></b></article>
+  <article class="metric unset"><div><i>{{ icon('circle-help') }}</i><span>SIN CONFIGURAR</span></div><strong>{{ counts.unconfigured or 0 }}</strong><b></b></article>
+</section>

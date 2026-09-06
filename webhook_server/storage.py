@@ -6,13 +6,10 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from runtime_config import database_path
 
 
 LOCAL_MAIN_DB = Path(__file__).resolve().parents[1] / "8plast_stock.db"
-
-
-def database_path() -> Path:
-    return Path(os.environ.get("WEBHOOK_DATABASE_PATH") or os.environ.get("DATABASE_PATH") or LOCAL_MAIN_DB)
 
 
 def utc_now() -> str:

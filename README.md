@@ -1,5 +1,7 @@
 # 8Plast Stock
 
+**Railway / versión nube:** ver [RAILWAY.md](RAILWAY.md). El arranque es `python cloud_start.py`, con volumen `/data` y sincronización inicialmente en espera (`MELI_SYNC_ENABLED=0`). El portal cloud permite consultar y gestionar inventario con autenticación. El escritorio Windows se conserva; no habilitar dos responsables de sincronización durante el traspaso.
+
 Aplicación local de gestión de stock para bolsas cortadas y rollos bolsa tubo.
 
 ## Cómo abrirla
@@ -18,6 +20,19 @@ No necesita internet, servidor, usuario ni contraseña. No cierres la ventana ne
 3. Para una bolsa podés cargar producción en bolsas individuales o en packs físicos. El stock real siempre queda expresado en bolsas.
 4. Para ventas y otras salidas, usá **Registrar movimiento**. El sistema impide que el stock quede negativo.
 5. Consultá todos los cambios en **Movimientos**.
+
+## Carga masiva de productos
+
+La barra superior incluye **Descargar plantilla** y **Carga masiva**.
+
+1. Pulsá **Descargar plantilla** y guardá el archivo Excel.
+2. Completá las hojas **Bolsas** y **Rollos** sin cambiar los encabezados. Podés borrar las filas de ejemplo.
+3. En `activo` usá `SI` o `NO`. Los stocks y el pack de almacenamiento deben ser enteros; medidas y micrones deben ser números positivos.
+4. Pulsá **Carga masiva** y elegí el `.xlsx`. También se admite un `.csv` de un solo tipo, identificado por la columna `largo_cm` o `metros`.
+5. Revisá la vista previa: muestra filas válidas, SKU duplicados y errores. Nada se guarda todavía.
+6. Confirmá para importar únicamente las filas válidas. Justo antes se crea `8plast_stock_pre_carga_masiva_FECHA_HORA.db`.
+
+Los SKU existentes o repetidos dentro del archivo nunca se actualizan ni se importan. La confirmación se ejecuta como una sola operación: si ocurre un fallo inesperado, no se agrega ningún producto. Un stock inicial mayor que cero genera exactamente un movimiento histórico de entrada; un stock inicial cero no crea un movimiento innecesario. La carga no modifica asociaciones, credenciales ni información de MercadoLibre.
 
 ## Criterio de stock
 
@@ -58,7 +73,9 @@ La base ya incluye:
 - modo `SOLO_DESCONTAR_VENTAS` (predeterminado) o `SINCRONIZAR_STOCK`;
 - referencia externa única para impedir que una orden o venta se descuente dos veces.
 
-En el modo predeterminado, una venta descontará el stock físico y generará un único movimiento, pero no reemplazará la cantidad publicada en MercadoLibre. La pantalla **MercadoLibre** permite crear varias asociaciones para un mismo producto, autorizar la cuenta y leer las 50 órdenes más recientes. Las órdenes repetidas y cancelaciones repetidas no duplican movimientos. Esta versión no contiene ninguna llamada para modificar publicaciones.
+En el modo predeterminado, una venta descontará el stock físico y generará un único movimiento, pero no reemplazará la cantidad publicada en MercadoLibre. La pantalla **MercadoLibre** permite crear varias asociaciones para un mismo producto, autorizar la cuenta y leer las 50 órdenes más recientes. Las órdenes repetidas no duplican movimientos. Las cancelaciones quedan pendientes de revisión y no reponen stock automáticamente. Esta versión no contiene ninguna llamada para modificar publicaciones.
+
+Cada asociación guarda automáticamente **Desde / Inicio de sincronización**. Al usar **Leer ventas ahora**, las órdenes creadas antes de esa fecha se ignoran y no afectan el stock. Las asociaciones que existían antes de incorporar esta protección reciben como inicio el momento de la migración. Una orden sin fecha válida también se omite por seguridad. La pantalla y el resumen de lectura muestran cuántas órdenes fueron descartadas por estas razones.
 
 ## Cómo conectar MercadoLibre
 
@@ -78,7 +95,7 @@ MercadoLibre documenta que el código se intercambia en `/oauth/token`, que los 
 
 ### Cancelaciones, devoluciones y notificaciones
 
-- Si una orden previamente descontada aparece luego con estado `cancelled`, la lectura reintegra exactamente el movimiento original una sola vez.
+- Si una orden aparece con estado `cancelled`, queda registrada una sola vez como revisión pendiente y no modifica el stock. Las notificaciones repetidas de la misma cancelación incrementan su contador de observaciones, sin crear movimientos de stock.
 - La base y la lógica de movimientos ya soportan devoluciones únicas por referencia externa.
 - Para detectar devoluciones parciales automáticamente y recibir ventas en tiempo real se deberá configurar un webhook público HTTPS con el tópico `orders_v2` y, según el caso, recursos de devoluciones. Una aplicación que corre solamente dentro de esta PC no puede recibir notificaciones públicas por sí sola. Hasta contar con esa URL, usá **Leer ventas ahora**.
 - No actives una asociación hasta confirmar producto, variación y cantidad consumida. Si una venta supera el stock físico disponible, se rechaza sin dejar el stock negativo y debe resolverse manualmente.
@@ -153,3 +170,18 @@ https://NOMBRE-REAL-DEL-SERVICIO.onrender.com/webhook/mercadolibre
 ```
 
 Pegalo en **Notificaciones callbacks URL** y habilitá el tópico recomendado `orders_v2`. No uses literalmente `NOMBRE-REAL-DEL-SERVICIO`: reemplazalo por el subdominio asignado por Render. MercadoLibre documenta que las notificaciones incluyen `resource`, `user_id`, `topic`, `application_id`, `attempts`, `sent` y `received`, y luego permiten consultar el recurso real con autenticación. Consultá la [documentación oficial de notificaciones](https://developers.mercadolibre.com.ar/es_ar/atributos-y-variaciones/productos-recibe-notificaciones).
+# Recuperación automática de ventas
+
+El trabajador de Mercado Libre persiste primero cada orden en `marketplace_order_inbox` y recién
+después procesa el descuento físico en orden cronológico. Mantiene puntos de control separados para
+órdenes creadas, órdenes actualizadas y órdenes procesadas. Las búsquedas se dividen en ventanas de
+24 horas y se recorren con paginación de 50 resultados; cada reanudación repite una hora como margen
+de seguridad y la unicidad por orden/movimiento evita descuentos duplicados.
+
+Las cancelaciones quedan en revisión y nunca reponen stock automáticamente. Las publicaciones
+excluidas o no asociadas quedan clasificadas sin movimiento. El cliente de recuperación sólo usa
+consultas de órdenes y no contiene operaciones de actualización de publicaciones o stock publicado.
+
+`preparar_inicio_automatico.ps1` instala, únicamente cuando se lo ejecuta expresamente, una tarea de
+Windows al iniciar sesión. La tarea abre `iniciar_trabajador_ml.bat`; el trabajador utiliza un bloqueo
+exclusivo para impedir dos instancias y respeta el intervalo configurado de 300 segundos.

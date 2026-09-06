@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block content %}
+{% if kind=='BAG' %}<nav class="color-tabs" aria-label="Filtrar bolsas por color">
+{% for option in bag_colors %}<a class="{{ 'active' if color==option }}" href="{{ url_for('bags',color=option,q=search,state=state) }}">{{ option }}</a>{% endfor %}
+</nav>{% endif %}
+{% if kind=='ROLL' %}<nav class="color-tabs" aria-label="Filtrar rollos por micronaje">
+{% for option in roll_micron_tabs %}<a class="{{ 'active' if roll_microns==option }}" href="{{ url_for('rolls',microns=option,q=search,state=state) }}">{{ option }}</a>{% endfor %}
+</nav>{% endif %}
+{% include "_metrics.html" %}
+<form class="filters" method="get">{% if kind=='BAG' %}<input type="hidden" name="color" value="{{ color }}">{% else %}<input type="hidden" name="microns" value="{{ roll_microns }}">{% endif %}<input name="q" value="{{ search }}" placeholder="Buscar por SKU, producto, color o tipo"><select name="state">
+{% for option in ['Todos','OK','BAJO','REPONER','SIN STOCK','BAJO + REPONER','SIN CONFIGURAR'] %}<option {{ 'selected' if state==option.upper() }}>{{ option }}</option>{% endfor %}
+</select><button>Filtrar</button><a href="{{ url_for('bags',color=color) if kind=='BAG' else url_for('rolls',microns=roll_microns) }}">Limpiar</a></form>
+<div class="table-wrap"><table class="stock-table"><thead><tr><th>SKU</th><th><a class="sort-link" href="?q={{ search }}&state={{ state }}&sort=product&dir={{ 'desc' if sort=='product' and direction=='asc' else 'asc' }}">Producto</a></th><th>Medida</th><th>Micrones</th>{% if kind=='ROLL' %}<th>Metros</th>{% endif %}<th><a class="sort-link" href="?q={{ search }}&state={{ state }}&sort=stock&dir={{ 'desc' if sort=='stock' and direction=='asc' else 'asc' }}">Stock actual</a></th><th>Stock mínimo</th><th>Stock objetivo</th><th>Faltante</th><th>Estado</th><th>Acción</th></tr></thead><tbody>
+{% for p in products %}<tr class="state-{{ p.state|lower|replace(' ','-') }}"><td class="sku">{{ p.sku }}</td><td class="product-name">{{ p.name }}</td><td>{{ p.width_cm|int }}{% if kind=='BAG' %}x{{ p.length_cm|int }}{% endif %} cm</td><td class="numeric">{{ p.microns|int }}</td>{% if kind=='ROLL' %}<td class="numeric">{{ p.meters_per_roll|int }} m</td>{% endif %}<td class="stock numeric">{{ p.stock }}</td><td class="numeric">{{ p.minimum_stock }}</td><td class="numeric">{{ p.target_stock }}</td><td class="missing numeric">{{ p.missing if p.missing is not none else '—' }}</td><td><span class="badge badge-{{ p.state|lower|replace(' ','-') }}">{{ p.state }}</span></td><td><a class="row-action" href="{{ url_for('product_history',product_id=p.id) }}">Ver historial</a></td></tr>{% else %}<tr><td class="empty-state" colspan="11">No se encontraron productos.</td></tr>{% endfor %}
+</tbody></table></div>{% endblock %}
