@@ -12,6 +12,14 @@ from ml_integration import MercadoLibreClient, MercadoLibreError
 from runtime_config import file_lock
 
 class CloudTests(unittest.TestCase):
+    def test_port_is_numeric_and_not_a_shell_placeholder(self):
+        from cloud_web import listen_port
+        for value in ('$PORT','${PORT}','0','65536','abc',''):
+            with patch.dict(os.environ,{'PORT':value}):
+                with self.assertRaises(RuntimeError): listen_port()
+        with patch.dict(os.environ,{'PORT':' 43210 '}):
+            self.assertEqual(listen_port(),43210)
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(); self.path=Path(self.tmp.name)/'stock.db'
         self.env=patch.dict(os.environ,{'APP_ENV':'cloud','DATABASE_PATH':str(self.path),'WEBHOOK_DATABASE_PATH':str(self.path),

@@ -9,6 +9,9 @@ from runtime_config import ROOT, data_dir, validate_railway_storage
 
 def main():
     os.environ['APP_ENV']='cloud'
+    from cloud_web import listen_port
+    port = listen_port()
+    print(json.dumps({'event':'cloud_boot','host':'0.0.0.0','port':port}),flush=True)
     validate_railway_storage()
     for key in ('PORTAL_PASSWORD','PORTAL_SECRET_KEY','MELI_TOKEN_KEY'):
         if not os.getenv(key): raise RuntimeError('Falta variable requerida: '+key)
@@ -18,7 +21,7 @@ def main():
     cipher()
     from db import Database
     Database()
-    commands={'web':[sys.executable,'-m','waitress','--listen=0.0.0.0:'+os.getenv('PORT','8000'),'--call','cloud_app:create_app'],
+    commands={'web':[sys.executable,str(ROOT/'cloud_web.py')],
               'worker':[sys.executable,str(ROOT/'mercadolibre_worker.py')]}
     children={}; started={}; stopping=False
     def stop(*args):
