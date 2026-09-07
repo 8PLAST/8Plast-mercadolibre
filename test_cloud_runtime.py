@@ -131,6 +131,18 @@ class CloudTests(unittest.TestCase):
         self.assertEqual(self.web.get('/health').status_code,503)
         (self.path.parent/'worker_status.json').write_text(json.dumps({'time':time.time(),'state':'standby'}))
         self.assertEqual(self.web.get('/health').status_code,200)
+        for state,stamp in [('error',time.time()),('running',time.time()-1000),('running',time.time()+1000)]:
+            (self.path.parent/'worker_status.json').write_text(json.dumps({'time':stamp,'state':state}))
+            self.assertEqual(self.web.get('/health').status_code,503)
+
+    def test_railway_requires_volume_and_database_inside_it(self):
+        from runtime_config import validate_railway_storage
+        with patch.dict(os.environ,{'RAILWAY_PROJECT_ID':'test','RAILWAY_VOLUME_MOUNT_PATH':''}):
+            with self.assertRaises(RuntimeError): validate_railway_storage()
+        with patch.dict(os.environ,{'RAILWAY_PROJECT_ID':'test','RAILWAY_VOLUME_MOUNT_PATH':'/data'}):
+            with self.assertRaises(RuntimeError): validate_railway_storage()
+            with patch.dict(os.environ,{k:'/data/8plast_stock.db' for k in ('DATABASE_PATH','WEBHOOK_DATABASE_PATH','PORTAL_DATABASE_PATH')}):
+                validate_railway_storage()
 
     def test_adjustment_replay_does_not_override_later_movement(self):
         pid=self.product(); os.environ['MELI_SYNC_ENABLED']='1'; self.login()

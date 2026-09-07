@@ -21,6 +21,17 @@ def data_dir():
 def sync_owner():
     return not cloud_mode() or os.getenv('MELI_SYNC_ENABLED', '0') == '1'
 
+def validate_railway_storage():
+    """Falla antes de crear datos si Railway no tiene el volumen esperado."""
+    if not os.getenv('RAILWAY_PROJECT_ID'):
+        return
+    mount = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '')
+    if mount != '/data':
+        raise RuntimeError('Montá un Railway Volume en /data antes de iniciar.')
+    path = database_path().resolve()
+    if not path.is_relative_to(Path('/data').resolve()):
+        raise RuntimeError('La base de Railway debe estar dentro de /data.')
+
 @contextmanager
 def file_lock(path, timeout=0):
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)

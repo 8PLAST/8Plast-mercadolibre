@@ -5,10 +5,11 @@ import signal
 import subprocess
 import sys
 import time
-from runtime_config import ROOT, data_dir
+from runtime_config import ROOT, data_dir, validate_railway_storage
 
 def main():
     os.environ['APP_ENV']='cloud'
+    validate_railway_storage()
     for key in ('PORTAL_PASSWORD','PORTAL_SECRET_KEY','MELI_TOKEN_KEY'):
         if not os.getenv(key): raise RuntimeError('Falta variable requerida: '+key)
     if len(os.environ['PORTAL_PASSWORD'])<16 or len(os.environ['PORTAL_SECRET_KEY'])<32:

@@ -49,13 +49,13 @@ def process_notifications(db, client):
 
 def run():
     with file_lock(LOCK):
-        db=Database(); client=MercadoLibreClient(db); next_poll=0; next_queue=0
+        db=Database(); client=MercadoLibreClient(db); next_poll=0; next_queue=0; worker_state='running'
         log('worker_started')
         while True:
             config=db.marketplace_processing_config()
             if not sync_owner() or not config or not config['enabled']:
                 heartbeat('standby'); time.sleep(5); continue
-            heartbeat('running')
+            heartbeat(worker_state)
             try:
                 if time.monotonic()>=next_poll:
                     audit=db.marketplace_audit_state()
@@ -63,13 +63,15 @@ def run():
                     summary=client.sync_orders_recovery()
                     log('poll_partial' if summary['processing']['errors'] else 'poll_completed',summary=summary)
                     next_poll=time.monotonic()+int(config['interval_seconds'] or 300)
-                    heartbeat('running',last_success=time.time())
+                    worker_state='running'
+                    heartbeat(worker_state,last_success=time.time())
                 if time.monotonic()>=next_queue:
                     process_notifications(db,client)
                     result=db.process_marketplace_inbox()
                     if result['pending']: log('notifications_processed',summary=result)
                     next_queue=time.monotonic()+10
             except Exception as exc:
+                worker_state='error'
                 log('poll_error',error=type(exc).__name__)
                 heartbeat('error',error=type(exc).__name__)
                 next_poll=time.monotonic()+60; next_queue=next_poll

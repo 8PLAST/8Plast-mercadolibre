@@ -27,10 +27,12 @@ Las notificaciones se guardan antes del HTTP 200; el worker valida topic, ruta d
 
 El portal conserva las pantallas de análisis e inventario y agrega Gestión: productos, activación, mínimos/objetivos, producción en unidades o packs, movimientos, conciliación, asociaciones, exclusiones, devoluciones, presentaciones, importación XLSX/CSV, auditoría y descarga de backup. No elimina productos ni historial. Tiene sesión HTTPS, CSRF y límite de intentos de login. Los formularios de movimientos usan claves únicas contra reenvíos.
 
-Respaldar el volumen y conservar MELI_TOKEN_KEY fuera del repositorio. Un 200 de /health verifica base accesible y heartbeat reciente, y publica standby/running/error; revisar además logs y checkpoints para certificar sincronización comercial exitosa. No interpretar standby como importación completa.
+Respaldar el volumen y conservar MELI_TOKEN_KEY fuera del repositorio. Un 200 de /health verifica base accesible y heartbeat reciente en standby/running; error o heartbeat vencido devuelve 503; revisar además logs y checkpoints para certificar sincronización comercial exitosa. No interpretar standby como importación completa.
 
 ## Pruebas
 
 `python -m unittest test_cloud_runtime test_ml_tokens test_stock test_readonly_portal -v`
 
 Los tests cloud usan bases temporales y API simulada, nunca credenciales reales. Las pruebas históricas locales adicionales copian la base local y no se ejecutan sobre Railway. `tools/smoke_cloud.py` levanta servidor/worker en standby sobre una base temporal y comprueba reinicio de worker y persistencia. Los tests no certifican conectividad real de un deployment que aún no tenga variables/volumen.
+
+El arranque en Railway exige RAILWAY_VOLUME_MOUNT_PATH=/data (variable automática al adjuntar el volumen) y rechaza bases fuera de /data. No crear esa variable manualmente para simular un volumen.
