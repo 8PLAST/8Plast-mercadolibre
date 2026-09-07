@@ -10,9 +10,14 @@ def cloud_mode():
     return os.getenv('APP_ENV') == 'cloud' or bool(os.getenv('RAILWAY_PROJECT_ID'))
 
 def database_path():
-    paths = [os.getenv(k) for k in ('DATABASE_PATH', 'WEBHOOK_DATABASE_PATH', 'PORTAL_DATABASE_PATH') if os.getenv(k)]
+    configured = {k: os.getenv(k, '').strip() for k in
+                  ('DATABASE_PATH', 'WEBHOOK_DATABASE_PATH', 'PORTAL_DATABASE_PATH')}
+    configured = {k: v for k, v in configured.items() if v}
+    paths = list(configured.values())
     if cloud_mode() and len({str(Path(p).resolve()) for p in paths}) > 1:
-        raise RuntimeError('Las rutas de base de datos deben coincidir.')
+        names = ', '.join(configured)
+        raise RuntimeError('Conflicto entre '+names+'. Configurá esas variables con la misma ruta '
+                           '/data/8plast_stock.db en Railway. No se abrió ni reemplazó ninguna base.')
     return Path(paths[0]) if paths else (Path('/data/8plast_stock.db') if cloud_mode() else ROOT/'8plast_stock.db')
 
 def data_dir():

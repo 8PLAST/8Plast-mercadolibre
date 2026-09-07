@@ -177,4 +177,20 @@ class CloudTests(unittest.TestCase):
         with patch.dict(os.environ,{'WEBHOOK_DATABASE_PATH':'/another/path.db'}):
             with self.assertRaises(RuntimeError): database_path()
 
+    def test_database_conflict_does_not_touch_either_file(self):
+        from runtime_config import database_path
+        other=self.path.parent/'other.db'
+        other.write_bytes(b'existing-data-must-not-change')
+        original=self.path.read_bytes()
+        with patch.dict(os.environ,{'PORTAL_DATABASE_PATH':str(other)}):
+            with self.assertRaisesRegex(RuntimeError,'PORTAL_DATABASE_PATH'):
+                database_path()
+        self.assertEqual(self.path.read_bytes(),original)
+        self.assertEqual(other.read_bytes(),b'existing-data-must-not-change')
+
+    def test_database_paths_ignore_surrounding_whitespace(self):
+        from runtime_config import database_path
+        with patch.dict(os.environ,{'WEBHOOK_DATABASE_PATH':' '+str(self.path)+'\n'}):
+            self.assertEqual(database_path(),self.path)
+
 if __name__=='__main__': unittest.main()
