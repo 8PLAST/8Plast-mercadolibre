@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --chdir webhook_server --workers 1 --threads 4 --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --config gunicorn.conf.py webhook_server.app:app
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:

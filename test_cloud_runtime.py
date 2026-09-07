@@ -12,6 +12,12 @@ from ml_integration import MercadoLibreClient, MercadoLibreError
 from runtime_config import file_lock
 
 class CloudTests(unittest.TestCase):
+    def test_deployment_commands_do_not_expand_port_in_shell(self):
+        root=Path(__file__).resolve().parent
+        self.assertNotIn('$PORT',(root/'render.yaml').read_text())
+        self.assertIn('ENTRYPOINT ["python", "/app/cloud_start.py"]',(root/'Dockerfile').read_text())
+        self.assertEqual(json.loads((root/'railway.json').read_text())['deploy']['startCommand'],'python cloud_start.py')
+
     def test_port_is_numeric_and_not_a_shell_placeholder(self):
         from cloud_web import listen_port
         for value in ('$PORT','${PORT}','0','65536','abc',''):
