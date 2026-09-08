@@ -22,7 +22,7 @@ class BagColorTabTests(unittest.TestCase):
 
     def test_tabs_filter_existing_rows_without_duplicates(self):
         bags=list(self.db.products("BAG",active="Activos"))
-        self.assertEqual(BAG_COLOR_TABS,("Todas","Negras","Verdes","Amarillas","Azules","Rojas"))
+        self.assertEqual(BAG_COLOR_TABS,("Todas","Negras","Verdes","Amarillas","Azules","Rojas","Polietileno cristal"))
         self.assertEqual(len(filter_bags_by_color(bags,"Todas")),7)
         expected={"Negras":"Negro","Verdes":"Verde","Amarillas":"Amarillo","Azules":"Azul","Rojas":"Rojo"}
         for tab,color in expected.items():

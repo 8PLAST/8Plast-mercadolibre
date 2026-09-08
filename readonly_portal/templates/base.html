@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  {% if page != 'management' %}<meta http-equiv="refresh" content="60">{% endif %}
+  {% if page not in ('management','inventory') %}<meta http-equiv="refresh" content="60">{% endif %}
   <title>8PLAST STOCK · Consulta</title>
   <link rel="stylesheet" href="{{ url_for('static',filename='portal.css',v='20260829-phase32') }}">
   <script defer src="{{ url_for('static',filename='portal.js') }}"></script>
@@ -18,9 +18,9 @@
     <a class="{{ 'active' if page=='movements' }}" href="/movimientos">{{ icon('history','nav-icon') }}Movimientos</a>
     <a class="{{ 'active' if page=='marketplace' }}" href="/mercadolibre">{{ icon('store','nav-icon') }}Mercado Libre</a>
     <a class="{{ 'active' if page=='statistics' }}" href="/estadisticas">{{ icon('chart','nav-icon') }}Estadísticas</a>
-    {% if cloud_portal %}<a href="/gestion">Gestionar inventario</a>{% endif %}
+    {% if cloud_portal %}<a class="{{ 'active' if page=='inventory' }}" href="{{ url_for('add_inventory') }}">{{ icon('package','nav-icon') }}Agregar inventario</a><a href="/gestion">Gestionar inventario</a>{% endif %}
   </nav><p>{% if cloud_portal %}Gestión en la nube{% else %}Consulta remota<br>Solo lectura{% endif %}</p></aside>
-  <div class="workspace"><header><div><strong>{{ {'dashboard':'Panel principal','bags':'Bolsas','rolls':'Rollos','replenishment':'Plan de producción','movements':'Movimientos y ventas','marketplace':'Mercado Libre','statistics':'Estadísticas','history':'Historial del producto'}[page] }}</strong><span>{{ {'dashboard':'Resumen general del inventario','bags':'Inventario físico, niveles y disponibilidad','rolls':'Inventario físico, niveles y disponibilidad','replenishment':'Qué conviene fabricar primero según stock y ventas reales','movements':'Historial auditable de entradas y salidas','marketplace':'Ventas, cobertura y vinculaciones reales','statistics':'Análisis de ventas y rotación','history':'Trazabilidad individual de stock'}[page] }}</span></div><button type="button" id="refresh">{{ icon('refresh-cw','button-icon') }}Actualizar</button></header>
+  <div class="workspace"><header><div><strong>{{ {'inventory':'Agregar inventario','management':'Gestionar inventario','dashboard':'Panel principal','bags':'Bolsas','rolls':'Rollos','replenishment':'Plan de producción','movements':'Movimientos y ventas','marketplace':'Mercado Libre','statistics':'Estadísticas','history':'Historial del producto'}[page] }}</strong><span>{{ {'inventory':'Sumá producción o actualizá el stock contado','management':'Configuración y operaciones','dashboard':'Resumen general del inventario','bags':'Inventario físico, niveles y disponibilidad','rolls':'Inventario físico, niveles y disponibilidad','replenishment':'Qué conviene fabricar primero según stock y ventas reales','movements':'Historial auditable de entradas y salidas','marketplace':'Ventas, cobertura y vinculaciones reales','statistics':'Análisis de ventas y rotación','history':'Trazabilidad individual de stock'}[page] }}</span></div><button type="button" id="refresh">{{ icon('refresh-cw','button-icon') }}Actualizar</button></header>
   <main>{% if cloud_portal %}{% for message in get_flashed_messages() %}<p role="status">{{ message }}</p>{% endfor %}{% endif %}{% block content %}{% endblock %}</main>
   <footer><span>8PLAST STOCK · acceso protegido</span><span id="updated"></span></footer></div></div>
 </body></html>

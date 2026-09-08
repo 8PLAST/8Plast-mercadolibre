@@ -12,7 +12,7 @@ from db import DB_PATH, MOVEMENT_TYPES, Database, StockError
 from product_planning import build_production_plan
 
 
-BAG_COLOR_TABS=("Todas","Negras","Verdes","Amarillas","Azules","Rojas")
+BAG_COLOR_TABS=("Todas","Negras","Verdes","Amarillas","Azules","Rojas","Polietileno cristal")
 ROLL_MICRON_TABS=("Todos","50 micrones","70 micrones")
 BAG_COLOR_VALUES={
     "Negras":{"negro","negra","negros","negras"},
@@ -26,6 +26,9 @@ BAG_COLOR_VALUES={
 def bag_matches_color(product, selected_color):
     """Filtro visual: nunca transforma ni duplica el producto recibido."""
     if selected_color=="Todas": return True
+    if selected_color=="Polietileno cristal":
+        data=dict(product)
+        return data.get("kind")=="BAG" and (str(data.get("category","")).strip().casefold()=="cristal" or str(data.get("sku","")).upper().startswith("CRI-"))
     value=str(product["color_material"] or "").strip().casefold()
     return value in BAG_COLOR_VALUES.get(selected_color,set())
 
@@ -455,7 +458,8 @@ class StockApp(tk.Tk):
         tk.Label(user,text="Administrador",font=("Segoe UI Semibold",9),fg=NAVY,bg=CARD).pack(side="left",padx=(9,0))
         self.tabs=ttk.Notebook(main,style="Navigation.TNotebook"); self.tabs.pack(fill="both",expand=True,padx=26,pady=20)
         self.dashboard_tab=ttk.Frame(self.tabs,padding=4); self.bags_tab=ttk.Frame(self.tabs,padding=4); self.rolls_tab=ttk.Frame(self.tabs,padding=4); self.replenishment_tab=ttk.Frame(self.tabs,padding=4); self.history_tab=ttk.Frame(self.tabs,padding=4); self.ml_tab=ttk.Frame(self.tabs,padding=4); self.statistics_tab=ttk.Frame(self.tabs,padding=4); self.settings_tab=ttk.Frame(self.tabs,padding=4)
-        sections=[("home","Inicio",self.dashboard_tab),("package","Bolsas",self.bags_tab),("rolls","Rollos",self.rolls_tab),("alert","Reposición",self.replenishment_tab),("history","Movimientos",self.history_tab),("store","Mercado Libre",self.ml_tab),("chart","Estadísticas",self.statistics_tab),("settings","Configuración",self.settings_tab)]
+        self.inventory_tab=ttk.Frame(self.tabs,padding=4)
+        sections=[("home","Inicio",self.dashboard_tab),("package","Bolsas",self.bags_tab),("rolls","Rollos",self.rolls_tab),("alert","Reposición",self.replenishment_tab),("history","Movimientos",self.history_tab),("store","Mercado Libre",self.ml_tab),("chart","Estadísticas",self.statistics_tab),("settings","Configuración",self.settings_tab),("inventory","Agregar inventario",self.inventory_tab)]
         self.nav_buttons=[]
         for index,(icon,title,frame) in enumerate(sections):
             self.tabs.add(frame,text=title)
@@ -467,7 +471,7 @@ class StockApp(tk.Tk):
             for widget in (item,marker,body,ico,label): widget.bind("<Button-1>",lambda _e,i=index:self.select_section(i))
             self.nav_buttons.append((item,marker,body,ico,label))
         tk.Label(sidebar,text="SOLO LECTURA ML",font=("Segoe UI Semibold",7),fg="#9ca3af",bg=SIDEBAR).pack(side="bottom",pady=18)
-        self.build_dashboard(); self.build_products(self.bags_tab,"BAG"); self.build_products(self.rolls_tab,"ROLL"); self.build_replenishment(); self.build_history(); self.build_ml(); self.build_statistics(); self.build_settings()
+        self.build_dashboard(); self.build_products(self.bags_tab,"BAG"); self.build_products(self.rolls_tab,"ROLL"); self.build_replenishment(); self.build_history(); self.build_ml(); self.build_statistics(); self.build_settings(); self.build_inventory()
         self.select_section(0)
 
     def select_section(self,index):
@@ -475,6 +479,16 @@ class StockApp(tk.Tk):
         for i,(item,marker,body,ico,label) in enumerate(self.nav_buttons):
             active=i==index; bg="#eef6ff" if active else SIDEBAR
             item.configure(bg=bg); marker.configure(bg=BLUE if active else SIDEBAR); body.configure(bg=bg); ico.configure(bg=bg); label.configure(bg=bg,fg=BLUE if active else MUTED)
+
+    def build_inventory(self):
+        body=ttk.Frame(self.inventory_tab,padding=24,style="Card.TFrame"); body.pack(fill="both",expand=True)
+        ttk.Label(body,text="Agregar inventario",style="Section.TLabel").pack(anchor="w",pady=(0,20))
+        ttk.Label(body,text="Sumar stock",style="Section.TLabel").pack(anchor="w")
+        ttk.Label(body,text="Agregá las bolsas o rollos que ingresan al saldo actual.",style="Card.TLabel").pack(anchor="w",pady=8)
+        ttk.Button(body,text="Agregar stock",style="Primary.TButton",command=lambda:MovementDialog(self,"Entrada de producción")).pack(anchor="w",pady=(0,28))
+        ttk.Label(body,text="Actualizar por conteo físico",style="Section.TLabel").pack(anchor="w")
+        ttk.Label(body,text="Ingresá el total real contado. El saldo quedará en esa cantidad.",style="Card.TLabel").pack(anchor="w",pady=8)
+        ttk.Button(body,text="Guardar stock contado",command=lambda:MovementDialog(self,"Ajuste de inventario")).pack(anchor="w")
 
     def build_dashboard(self):
         heading=tk.Frame(self.dashboard_tab,bg=BG); heading.pack(fill="x",pady=(0,8))

@@ -68,6 +68,20 @@ class CloudTests(unittest.TestCase):
         self.assertEqual(self.db.product(pid)['stock'],8)
         self.assertIn(b'Venta web',self.web.get('/movimientos',base_url='https://localhost').data)
 
+    def test_inventory_page_and_stock_actions(self):
+        self.assertEqual(self.web.get('/agregar-inventario').status_code,302)
+        pid=self.product(); os.environ['MELI_SYNC_ENABLED']='1'; self.login()
+        page=self.web.get('/agregar-inventario',base_url='https://localhost').get_data(as_text=True)
+        self.assertIn('Agregar inventario',page)
+        self.assertIn('TEST-CLOUD',page)
+        self.assertNotIn('http-equiv="refresh"',page)
+        data={'action':'movement','product_id':str(pid),'amount':'20','movement_type':'Entrada manual','reason':'Ingreso','request_key':'inventory-entry','return_to':'inventory'}
+        result=self.post('/gestion/accion',data)
+        self.assertEqual(result.location,'/agregar-inventario')
+        self.assertEqual(self.db.product(pid)['stock'],30)
+        self.post('/gestion/accion',{'action':'adjust','product_id':str(pid),'target':'15','reason':'Conteo','request_key':'inventory-count','return_to':'inventory'})
+        self.assertEqual(self.db.product(pid)['stock'],15)
+
     def test_product_and_association_forms(self):
         os.environ['MELI_SYNC_ENABLED']='1'; self.login()
         data={'action':'product','kind':'ROLL','sku':'ROLL-TEST','name':'Rollo prueba','width_cm':'60','microns':'50','meters_per_roll':'100','minimum_stock':'1','target_stock':'10','storage_pack':'50','initial_stock':'3'}

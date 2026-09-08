@@ -22,6 +22,7 @@ BAG_COLORS={
     "Amarillas":("amarillo","amarilla","amarillos","amarillas"),
     "Azules":("azul","azules"),
     "Rojas":("rojo","roja","rojos","rojas"),
+    "Polietileno cristal":(),
 }
 ROLL_MICRONS={"Todos":None,"50 micrones":50,"70 micrones":70}
 
@@ -117,7 +118,9 @@ def create_app(config=None):
         roll_microns=request.args.get("microns","Todos") if kind=="ROLL" else "Todos"
         if roll_microns not in ROLL_MICRONS: roll_microns="Todos"
         where=["p.kind=?","p.active=1"]; args=[kind]
-        if kind=="BAG" and color!="Todas":
+        if kind=="BAG" and color=="Polietileno cristal":
+            where.append("(LOWER(TRIM(p.category))='cristal' OR UPPER(p.sku) LIKE 'CRI-%')")
+        elif kind=="BAG" and color!="Todas":
             values=BAG_COLORS[color]
             where.append(f"LOWER(TRIM(p.color_material)) IN ({','.join('?' for _ in values)})")
             args.extend(values)

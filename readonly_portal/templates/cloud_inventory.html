@@ -1,0 +1,27 @@
+{% extends 'base.html' %}{% block content %}
+{% macro fields(action) %}
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ action }}"><input type="hidden" name="request_key" value="{{ request_key }}-{{ action }}"><input type="hidden" name="return_to" value="inventory">
+<label>Producto <select name="product_id" required><option value="">Elegí un producto</option>{% for p in products %}<option value="{{ p.id }}">{{ p.sku }} · {{ p.name }} · saldo {{ p.stock }} {{ 'bolsas' if p.kind=='BAG' else 'rollos' }}{% if p.kind=='BAG' %} · pack de {{ p.storage_pack }}{% endif %}</option>{% endfor %}</select></label>
+{% endmacro %}
+{% if not owner %}<p role="status">La página está en modo de espera. La carga de inventario se habilita al completar el traspaso de la gestión a la nube.</p>{% endif %}
+{% if not products %}<p>Primero <a href="{{ url_for('manage') }}">agregá un producto</a> para cargar su inventario.</p>{% endif %}
+<section class="inventory-card">
+<h2>Sumar stock</h2><p>Registrá las bolsas o rollos que ingresan. La cantidad se suma al saldo actual.</p>
+<form action="{{ url_for('action') }}" method="post">
+{{ fields('movement') }}
+<label>Movimiento <select name="movement_type"><option>Entrada de producción</option><option>Entrada manual</option></select></label>
+<label>Cantidad que ingresa <input type="number" name="amount" min="1" step="1" required></label>
+<label>Unidad <select name="storage_packs"><option value="0">Unidades físicas (bolsas individuales o rollos)</option><option value="1">Packs físicos (solo bolsas)</option></select></label>
+<p>Ejemplo: si tenés 500 bolsas y agregás 1.000 unidades físicas, quedan 1.500. Los packs usan la cantidad configurada que aparece junto al producto.</p>
+<label>Motivo <input name="reason" placeholder="Por ejemplo: producción del día" required></label>
+<button {% if not owner or not products %}disabled{% endif %}>Agregar stock</button>
+</form></section>
+<section class="inventory-card">
+<h2>Actualizar por conteo físico</h2><p>Ingresá el total real que contaste. El saldo quedará en esa cantidad y el ajuste se guardará en el historial.</p>
+<form action="{{ url_for('action') }}" method="post">
+{{ fields('adjust') }}
+<label>Stock total contado (bolsas individuales o rollos) <input name="target" type="number" min="0" step="1" required></label>
+<label>Motivo del ajuste <input name="reason" placeholder="Por ejemplo: conteo de depósito" required></label>
+<button {% if not owner or not products %}disabled{% endif %}>Guardar stock contado</button>
+</form></section>
+{% endblock %}

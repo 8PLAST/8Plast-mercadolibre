@@ -75,6 +75,10 @@ def create_app(config=None):
             return {'status':'received','duplicate':result['duplicate']},200
         except sqlite3.Error: return {'status':'temporary_error'},503
 
+    @app.get('/agregar-inventario')
+    def add_inventory():
+        return render_template('cloud_inventory.html',page='inventory',products=db.products())
+
     @app.get('/gestion')
     def manage():
         selected=db.product(request.args.get('product',type=int)) if request.args.get('product') else None
@@ -138,7 +142,7 @@ def create_app(config=None):
                 else: abort(400)
             flash('Guardado correctamente.')
         except (ValueError,sqlite3.IntegrityError,TimeoutError) as exc: flash(str(exc))
-        return redirect('/gestion')
+        return redirect('/agregar-inventario' if f.get('return_to')=='inventory' else '/gestion')
 
     @app.post('/gestion/auditoria')
     def backup():
