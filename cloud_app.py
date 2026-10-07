@@ -25,6 +25,9 @@ def create_app(config=None):
     if not app.secret_key or not password: raise RuntimeError('Faltan credenciales del portal.')
     db=Database(app.config['DATABASE_PATH']); app.extensions['stock_db']=db
     client=MercadoLibreClient(db)
+    from assistant_center import register_center, integration_token_provider
+    register_center(app, Path(app.config['DATABASE_PATH']).parent / 'assistant_reviews.db',
+                    token_provider=integration_token_provider(client))
     failures={}
     # La app local continúa siendo de solo lectura; sólo esta fábrica habilita gestión.
     app.before_request_funcs[None]=[f for f in app.before_request_funcs.get(None,[]) if f.__name__!='enforce_read_only']

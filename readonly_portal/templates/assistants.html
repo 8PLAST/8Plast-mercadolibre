@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8Plast · Centro de asistentes</title><link rel="stylesheet" href="/static/assistants.css"></head>
+<body><main><a href="/">← Inventario</a><h1>Centro de asistentes</h1>
+<p class="notice">Lectura y sugerencias. Aprobar registra tu decisión; nunca envía respuestas ni cambia Mercado Libre.</p>
+<p>Borradores por reglas conservadoras. Proveedor de IA pendiente de configuración. La información interna de producción no se usa para responder clientes.</p>
+{% for message in get_flashed_messages() %}<p role="status" class="notice">{{ message }}</p>{% endfor %}
+<section><h2>Fuentes y actualización</h2>
+<p>Última consulta/importación exitosa: {{ (sync.success or 'Sin consultas exitosas') if sync else 'Sin consultas exitosas' }} (UTC). Fuente: {{ (sync.source or 'Pendiente') if sync else 'Pendiente' }}</p>
+<p>Último intento: {{ (sync.attempted or 'Sin intentos registrados') if sync else 'Sin intentos registrados' }}</p>
+{% if connection_message %}<p role="alert" class="notice">{{ connection_message }} <a href="https://8plast-mercadolibre-webhook-production.up.railway.app/asistentes">Abrir centro en Railway</a>. Si esa ruta no existe, falta desplegar esta versión con autorización.</p>{% endif %}
+{% if sync and sync.error %}<p role="alert">{{ sync.error }}</p>{% endif %}
+{% if sync and sync.warning %}<p role="alert">{{ sync.warning }}</p>{% endif %}
+<form action="/asistentes/consultar" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if not connection_ready %}disabled{% endif %}>Consultar preguntas en Mercado Libre</button></form>
+<form action="/asistentes/importar" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Preguntas y atributos públicos en JSON <input type="file" name="file" accept=".json" required></label><button>Importar archivo</button></form>
+<p>La consulta incluye hasta 200 preguntas. No garantiza historial completo. Los archivos deben contener datos públicos verificados, sin credenciales.</p></section>
+<h2>Bandeja de revisión · {{ rows|length }} preguntas</h2>
+{% for r in rows %}<article><h3>{{ r.title }} · {{ r.item_id }}</h3><p><strong>Pregunta:</strong> {{ r.question }}</p>
+<p>Estado externo: {{ r.external_status }} · Revisión: {{ r.status }} · Actualización: {{ r.updated }}</p>
+{% if r.external_answer %}<p>Respuesta ya publicada: {{ r.external_answer }}</p>{% endif %}
+<p><strong>Datos públicos utilizados:</strong> {% for k,v in r.used.items() %}{{ k }}: {{ v }}; {% else %}No hay atributos suficientes.{% endfor %}</p>
+{% if r.missing %}<p class="notice"><strong>Confirmar antes de responder:</strong> {{ r.missing|join(', ') }}. Cualquier discrepancia con producción requiere tu revisión.</p>{% endif %}
+<details><summary>Borrador original y atributos de la publicación</summary><p>{{ r.original }}</p><p>{{ r.facts }}</p></details>
+{% if r.approved %}<p><strong>Versión aprobada:</strong> {{ r.approved }}</p>{% endif %}
+<form action="/asistentes/decision/{{ r.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="version" value="{{ r.version }}">
+<label>Respuesta sugerida / tu corrección<textarea name="text" rows="4" maxlength="10000">{{ r.edited or r.original }}</textarea></label>
+<div class="actions"><button name="action" value="EDITADA">Guardar edición</button><button name="action" value="APROBADA">Aprobar versión</button><button name="action" value="RECHAZADA">Rechazar</button><button name="action" value="REVISADA">Marcar revisado</button></div></form>
+{% if r.examples %}<details><summary>Ejemplos aprobados para esta publicación</summary>{% for e in r.examples %}<p>{{ e.question }} → {{ e.after_text }}</p>{% endfor %}<p>Usalos como referencia. No se aplican automáticamente a otras preguntas, packs o productos.</p></details>{% endif %}
+</article>{% else %}<p>No hay preguntas cargadas. Consultá la API o importá un archivo.</p>{% endfor %}
+<section><h2>Historial de decisiones y correcciones</h2>{% for h in history %}<details><summary>{{ h.created }} · {{ h.item_id }} · {{ h.action }}</summary><p>Pregunta: {{ h.question }}</p><p>Antes: {{ h.before_text }}</p><p>Después: {{ h.after_text }}</p></details>{% else %}<p>Sin decisiones.</p>{% endfor %}<p>Se muestran las últimas 100 decisiones; el registro completo permanece en la base de revisión.</p></section>
+<section><h2>Próximas etapas</h2><p>Rentabilidad y costos, stock y producción: herramientas existentes; integración a recomendaciones pendiente. Catálogo, Ads, Full/Flex y reputación: pendientes de fuentes y desarrollo. Coordinador y resumen diario: pendientes. No se muestran resultados simulados como análisis reales.</p></section>
+</main></body></html>

@@ -11,5 +11,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: python -m unittest test_cloud_runtime test_stock test_ml_tokens webhook_server.test_webhook -v
+      - run: python -m unittest test_cloud_runtime test_stock test_ml_tokens test_assistant_center webhook_server.test_webhook -v
       - run: python tools/smoke_cloud.py
