@@ -23,6 +23,7 @@ FAILURES = {
     'AUTH_CONFIGURATION': 'No se pudo leer la configuración segura o faltan variables de autenticación. Revisá la configuración de la integración en Railway.',
     'SYNC_STANDBY': 'La integración de Railway está en espera. Un administrador debe revisar quién es responsable de sincronizar antes de habilitar consultas.',
     'PERMISSION_DENIED': 'Mercado Libre respondió HTTP 403. Revisá los permisos de lectura y el acceso de esta cuenta al recurso indicado; la API rechazó la consulta.',
+    'POLICY_DENIED': 'Mercado Libre rechazó la consulta por PolicyAgent (PA_UNAUTHORIZED_RESULT_FROM_POLICIES). Revisá el permiso funcional Comunicación pre y postventa de la aplicación y las políticas de acceso/IP. No se cambió ningún permiso ni se obtuvo una lista vacía exitosa.',
     'NOT_FOUND': 'Mercado Libre respondió HTTP 404: el recurso no está disponible para esta cuenta.',
     'RATE_LIMIT': 'Mercado Libre respondió HTTP 429: límite de consultas alcanzado. Esperá unos minutos antes de volver a consultar.',
     'API_UNAVAILABLE': 'Mercado Libre tuvo un error de servicio. Volvé a consultar más tarde.',
@@ -91,7 +92,7 @@ class ReadOnlyMercadoLibre:
 
     def request(self, path, method='GET', data=None):
         if method != 'GET' or data is not None or not re.fullmatch(
-                r'/users/me|/questions/search\?seller_id=\d+&api_version=4&limit=50&offset=\d+(?:&sort_fields=date_created&sort_types=DESC)?|/items/MLA\d+', path):
+                r'/users/me|/questions/search\?seller_id=\d+&api_version=4&limit=50&offset=\d+(?:&sort_fields=date_created&sort_types=DESC)?|/my/received_questions/search\?api_version=4&limit=50&offset=\d+&sort_fields=date_created&sort_types=DESC|/items/MLA\d+', path):
             raise PermissionError('Esta herramienta solo permite consultas autorizadas.')
         return self._get(path)
 
@@ -107,12 +108,19 @@ class ReadOnlyMercadoLibre:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
             status = exc.code
+            policy_denied = False
+            try:
+                error_body = json.loads(exc.read(8192))
+                policy_denied = isinstance(error_body, dict) and error_body.get('code') == 'PA_UNAUTHORIZED_RESULT_FROM_POLICIES'
+            except (ValueError, TypeError, OSError):
+                pass
             exc.close()
             if status == 401 and self.__token_provider and not retried:
                 self.__token = self.__token_provider(rejected_token=self.__token)
                 return self._get(path, retried=True)
             code = {401:'TOKEN_EXPIRED',403:'PERMISSION_DENIED',404:'NOT_FOUND',429:'RATE_LIMIT'}.get(status,
                     'API_UNAVAILABLE' if status >= 500 else 'API_REQUEST')
+            if status == 403 and policy_denied: code = 'POLICY_DENIED'
             raise QueryFailure(code, path.split('?')[0], status) from None
         except (TimeoutError, socket.timeout):
             raise QueryFailure('TIMEOUT', path.split('?')[0]) from None
@@ -134,13 +142,15 @@ def fetch_questions(token_provider):
     seller = me['id']
     questions, publications, warnings = [], {}, []
     for offset in range(0, 200, 50):
-        response = client.request(f'/questions/search?seller_id={seller}&api_version=4&limit=50&offset={offset}&sort_fields=date_created&sort_types=DESC')
+        response = client.request(f'/my/received_questions/search?api_version=4&limit=50&offset={offset}&sort_fields=date_created&sort_types=DESC')
         if not isinstance(response, dict) or not isinstance(response.get('questions'), list):
-            raise QueryFailure('INVALID_RESPONSE', '/questions/search')
+            raise QueryFailure('INVALID_RESPONSE', '/my/received_questions/search')
         batch = response['questions']
         for q in batch:
             if not isinstance(q, dict) or not re.fullmatch(r'MLA\d+', str(q.get('item_id',''))):
-                raise QueryFailure('INVALID_RESPONSE', '/questions/search')
+                raise QueryFailure('INVALID_RESPONSE', '/my/received_questions/search')
+            if q.get('seller_id') is not None and str(q['seller_id']) != str(seller):
+                raise QueryFailure('INVALID_RESPONSE', '/my/received_questions/search')
             if q.get('text') is None and q.get('status') in ('DELETED', 'BANNED'):
                 warnings.append('Pregunta oculta por Mercado Libre: texto no disponible.')
                 continue

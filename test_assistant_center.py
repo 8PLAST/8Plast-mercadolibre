@@ -134,7 +134,7 @@ class AssistantTests(unittest.TestCase):
     def test_real_shape_questions_load_even_when_item_forbidden(self):
         def api(path):
             if path=='/users/me': return {'id':123}
-            if path.startswith('/questions/search?'): return {'questions':payload()['questions']}
+            if path.startswith('/my/received_questions/search?'): return {'questions':payload()['questions']}
             raise QueryFailure('PERMISSION_DENIED', '/items/MLA123',403)
         with patch.object(ReadOnlyMercadoLibre,'request',side_effect=api):
             data,warnings=fetch_questions(lambda **kwargs:'token')
@@ -179,6 +179,21 @@ class AssistantTests(unittest.TestCase):
         with patch.object(ReadOnlyMercadoLibre,'request',side_effect=[{'id':123},{'error':'secret'}]):
             with self.assertRaises(QueryFailure) as raised: fetch_questions(lambda **kwargs:'token')
             self.assertEqual(raised.exception.code,'INVALID_RESPONSE')
+
+    def test_policy_error_extracts_only_known_code_never_response_secrets(self):
+        import io
+        body=io.BytesIO(b'{"code":"PA_UNAUTHORIZED_RESULT_FROM_POLICIES","message":"SENSITIVE_SECRET"}')
+        with patch('urllib.request.build_opener') as opener:
+            opener.return_value.open.side_effect=urllib.error.HTTPError('url',403,'no',{},body)
+            with self.assertRaises(QueryFailure) as raised: ReadOnlyMercadoLibre('token').request('/users/me')
+            self.assertEqual(raised.exception.code,'POLICY_DENIED')
+            self.assertNotIn('SENSITIVE_SECRET',raised.exception.public_message())
+
+    def test_received_questions_endpoint_is_scoped_to_token_owner(self):
+        wrong=payload()['questions'][0]; wrong['seller_id']=999
+        with patch.object(ReadOnlyMercadoLibre,'request',side_effect=[{'id':123},{'questions':[wrong]}]) as api:
+            with self.assertRaises(QueryFailure): fetch_questions(lambda **kwargs:'token')
+            self.assertIn('/my/received_questions/search?',api.call_args.args[0])
 
 
 if __name__ == '__main__': unittest.main()
