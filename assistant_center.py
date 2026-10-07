@@ -131,7 +131,7 @@ class ReadOnlyMercadoLibre:
             raise QueryFailure('INVALID_RESPONSE', path.split('?')[0]) from None
 
 
-def fetch_questions(token_provider):
+def fetch_questions(token_provider, item_loader=None):
     """No operational DB dependency. Failed item enrichment cannot hide valid questions."""
     if token_provider is None:
         raise QueryFailure('CONFIGURATION_MISSING')
@@ -160,11 +160,11 @@ def fetch_questions(token_provider):
         item_id = q['item_id']
         if item_id in publications: continue
         try:
-            item = client.request('/items/' + item_id)
+            item = item_loader(client,item_id) if item_loader else client.request('/items/' + item_id)
             if not isinstance(item, dict): raise QueryFailure('INVALID_RESPONSE', '/items/' + item_id)
             publications[item_id] = item
         except QueryFailure as exc:
-            if exc.code not in ('NOT_FOUND', 'PERMISSION_DENIED'): raise
+            if exc.code not in ('NOT_FOUND', 'PERMISSION_DENIED', 'POLICY_DENIED'): raise
             publications[item_id] = {}
             warnings.append(exc.public_message() + ' La pregunta se cargó sin atributos; requiere confirmar el producto.')
     return {'questions': questions, 'publications': publications}, warnings
@@ -309,17 +309,53 @@ def register_center(app, review_path, token_provider=None):
 
     @bp.get('/asistentes')
     def index():
+        import os
+        from assistant_automation import status, INTERVAL
+        monitor, alerts = status(store)
         with store.connect() as con:
             rows = [dict(r) for r in con.execute('SELECT * FROM questions ORDER BY updated DESC')]
             history = [dict(r) for r in con.execute('SELECT d.*,q.item_id,q.question FROM decisions d JOIN questions q ON q.id=d.question_id ORDER BY d.id DESC LIMIT 100')]
             sync = con.execute('SELECT * FROM sync WHERE id=1').fetchone()
+            drafts = {r['question_id']:dict(r) for r in con.execute('SELECT * FROM assistant_drafts')}
         for r in rows:
             for field in ('facts', 'missing', 'used'): r[field] = json.loads(r[field])
             # Corrections are examples scoped to this exact publication, never global rules.
             r['examples'] = [h for h in history if h['item_id'] == r['item_id'] and h['action'] == 'APROBADA'][:3]
         return render_template('assistants.html', rows=rows, history=history, sync=sync,
+            monitor=monitor, alerts=alerts, drafts=drafts, interval=INTERVAL,
+            telegram_configured=bool(os.getenv('TELEGRAM_BOT_TOKEN')),ai_configured=bool(os.getenv('OPENAI_API_KEY')),
             connection_ready=token_provider is not None,
             connection_message=None if token_provider else FAILURES['CONFIGURATION_MISSING'])
+
+    @bp.post('/asistentes/automatizacion')
+    def automation():
+        from assistant_automation import initialize, begin_pairing, queue_test, ServiceFailure
+        if token_provider is None: abort(409)
+        initialize(store)
+        action = request.form.get('action')
+        try:
+            if action == 'pair':
+                link = begin_pairing(store)
+                flash('Abrí el enlace de conexión en tu Telegram y pulsá Iniciar. Vence en 15 minutos.')
+                # Pairing nonce stays in authenticated session, never query strings/server logs.
+                from flask import session
+                session['assistant_pair_link'] = link
+            elif action == 'test':
+                flash('Aviso PRUEBA encolado: '+queue_test(store)+'. Esperá su llegada al celular.')
+            elif action == 'confirm':
+                with store.connect() as con:
+                    sent = con.execute("SELECT id FROM assistant_alerts WHERE kind='TEST' AND state='SENT' ORDER BY created DESC LIMIT 1").fetchone()
+                    if not sent: raise ServiceFailure('TEST_NOT_SENT')
+                    con.execute('UPDATE assistant_monitor SET test_confirmed=? WHERE id=1',(now(),))
+                flash('Recepción de PRUEBA confirmada por vos.')
+            elif action in ('enable','disable'):
+                with store.connect() as con:
+                    con.execute('UPDATE assistant_monitor SET enabled=? WHERE id=1',(int(action=='enable'),))
+                flash('Detección '+('activada en Railway; la primera consulta exitosa será histórica y silenciosa.' if action=='enable' else 'pausada.'))
+            else: abort(400)
+        except ServiceFailure as exc:
+            flash('No se completó la configuración: '+exc.code+'. Revisá Telegram y las Variables del servicio Railway; no compartas secretos.')
+        return redirect('/asistentes')
 
     @bp.post('/asistentes/importar')
     def import_file():

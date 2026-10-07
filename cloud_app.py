@@ -188,6 +188,11 @@ def create_app(config=None):
     @app.post('/oauth/start')
     def oauth_start():
         if not sync_owner(): abort(409,'Autorizá Mercado Libre después de detener el sincronizador local.')
+        from urllib.parse import urlparse
+        callback=urlparse(client.public_config().get('redirect_uri',''))
+        if callback.scheme!='https' or not callback.netloc or callback.path!='/oauth/callback':
+            flash('No se inició OAuth: MELI_REDIRECT_URI debe ser una dirección HTTPS completa terminada en /oauth/callback, idéntica a la URL de retorno registrada en Mercado Libre. Revisá las Variables de Railway; no cambies tokens ni los compartas.')
+            return redirect('/gestion')
         with token_lock():
             url=client.authorization_url()
             session['oauth_state']=client.secure_config()['oauth_state']

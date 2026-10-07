@@ -22,7 +22,8 @@ def main():
     from db import Database
     Database()
     commands={'web':[sys.executable,str(ROOT/'cloud_web.py')],
-              'worker':[sys.executable,str(ROOT/'mercadolibre_worker.py')]}
+              'worker':[sys.executable,str(ROOT/'mercadolibre_worker.py')],
+              'questions':[sys.executable,str(ROOT/'assistant_worker.py')]}
     children={}; started={}; stopping=False
     def stop(*args):
         nonlocal stopping
@@ -41,6 +42,12 @@ def main():
                 children['worker'].terminate()
                 try: children['worker'].wait(timeout=10)
                 except subprocess.TimeoutExpired: children['worker'].kill()
+            try: questions_last=json.loads((data_dir()/'assistant_worker_status.json').read_text())['time']
+            except (OSError,ValueError,KeyError): questions_last=started['questions']
+            if time.time()-max(questions_last,started['questions'])>600:
+                children['questions'].terminate()
+                try: children['questions'].wait(timeout=10)
+                except subprocess.TimeoutExpired: children['questions'].kill()
             time.sleep(5)
     finally:
         for child in children.values():

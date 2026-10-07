@@ -3,7 +3,7 @@
 <title>8Plast · Centro de asistentes</title><link rel="stylesheet" href="/static/assistants.css"></head>
 <body><main><a href="/">← Inventario</a><h1>Centro de asistentes</h1>
 <p class="notice">Lectura y sugerencias. Aprobar registra tu decisión; nunca envía respuestas ni cambia Mercado Libre.</p>
-<p>Borradores por reglas conservadoras. Proveedor de IA pendiente de configuración. La información interna de producción no se usa para responder clientes.</p>
+<p>IA: {{ 'clave configurada; consultar el estado de cada borrador' if ai_configured else 'pendiente: falta OPENAI_API_KEY en Railway; se usan reglas conservadoras' }}. La información interna de producción no se usa para responder clientes.</p>
 {% for message in get_flashed_messages() %}<p role="status" class="notice">{{ message }}</p>{% endfor %}
 <section><h2>Fuentes y actualización</h2>
 <p>Última consulta/importación exitosa: {{ (sync.success or 'Sin consultas exitosas') if sync else 'Sin consultas exitosas' }} (UTC). Fuente: {{ (sync.source or 'Pendiente') if sync else 'Pendiente' }}</p>
@@ -14,8 +14,28 @@
 <form action="/asistentes/consultar" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if not connection_ready %}disabled{% endif %}>Consultar preguntas en Mercado Libre</button></form>
 <form action="/asistentes/importar" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Preguntas y atributos públicos en JSON <input type="file" name="file" accept=".json" required></label><button>Importar archivo</button></form>
 <p>La consulta incluye hasta 200 preguntas. No garantiza historial completo. Los archivos deben contener datos públicos verificados, sin credenciales.</p></section>
+<section><h2>Detección y avisos privados</h2>
+<p>Detección: {{ 'ACTIVADA' if monitor.enabled else 'PAUSADA' }}. Consultas oficiales cada {{ interval }} segundos después de completar el ciclo, desde Railway. No necesita tu PC. Otros asistentes pausados.</p>
+<p>Proceso: {{ 'activo' if monitor.worker_fresh else 'sin señal reciente: revisar despliegue' }}. Última consulta automática exitosa: {{ monitor.last_success or 'Ninguna' }} (UTC). Inicio sin avisos históricos: {{ monitor.baseline or 'Pendiente de primera consulta exitosa' }}.</p>
+{% if monitor.error %}<p role="alert">Acceso a preguntas bloqueado o consulta fallida: {{ monitor.error }}. Cero preguntas NO significa éxito si existe este error.</p>{% endif %}
+<form action="/asistentes/automatizacion" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button name="action" value="{{ 'disable' if monitor.enabled else 'enable' }}" {% if not connection_ready %}disabled{% endif %}>{{ 'Pausar detección' if monitor.enabled else 'Activar detección en Railway' }}</button></form>
+<h3>Conectar Telegram</h3><ol>
+<li>En el celular abrí <a href="https://t.me/BotFather">@BotFather oficial</a>, enviá /newbot y elegí nombre y usuario terminado en bot. No lo agregues a grupos.</li>
+<li>En el proyecto existente de Railway, servicio del portal → Variables, agregá TELEGRAM_BOT_TOKEN con el token entregado por BotFather. Guardalo allí y aplicá el despliegue. Nunca lo pegues en este chat, URLs o archivos.</li>
+<li>Para IA agregá OPENAI_API_KEY en las Variables del mismo servicio. La API usa saldo de OpenAI separado de ChatGPT. No se muestra ni registra la clave. Modelo predeterminado: gpt-4.1-mini; opcional ASSISTANT_AI_MODEL.</li>
+<li>Volvé aquí, pulsá Conectar mi celular, abrí el enlace en Telegram y pulsá Iniciar. El vínculo es privado, de un solo uso y vence en 15 minutos.</li>
+<li>Enviá PRUEBA y confirmá que llegó al celular antes de considerar listo el canal. Activá las notificaciones del bot en Telegram y del sistema del celular.</li></ol>
+<p>Token de Telegram: {{ 'configurado' if telegram_configured else 'FALTA en Railway' }}. Celular: {{ 'vinculado a un chat privado' if monitor.paired else 'sin vincular' }}.</p>
+{% if monitor.channel_error %}<p role="alert">Telegram: {{ monitor.channel_error }}. Revisá token, Iniciar y bloqueo del bot. HTTP_409 indica otro receptor/webhook del bot; usá un bot dedicado.</p>{% endif %}
+<form action="/asistentes/automatizacion" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button name="action" value="pair" {% if not telegram_configured or not connection_ready %}disabled{% endif %}>Conectar mi celular</button></form>
+{% if session.get('assistant_pair_link') and not monitor.paired %}<p><a href="{{ session.assistant_pair_link }}" rel="noreferrer">Abrir conexión privada en Telegram</a>. No compartas este enlace.</p>{% endif %}
+<form action="/asistentes/automatizacion" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button name="action" value="test" {% if not monitor.paired %}disabled{% endif %}>Enviar aviso PRUEBA</button><button name="action" value="confirm" {% if not monitor.paired %}disabled{% endif %}>Confirmo que PRUEBA llegó al celular</button></form>
+<p>Recepción confirmada por vos: {{ monitor.test_confirmed or 'PENDIENTE' }}. SENT indica que Telegram aceptó el aviso, no que lo viste. UNKNOWN exige revisar el celular: no se reenvía automáticamente para evitar duplicados.</p>
+{% for a in alerts %}<p>{{ a.created }} · {{ a.kind }} · {{ a.id }} · {{ a.state }} {{ a.error or '' }}</p>{% else %}<p>Sin avisos registrados.</p>{% endfor %}
+</section>
 <h2>Bandeja de revisión · {{ rows|length }} preguntas</h2>
-{% for r in rows %}<article><h3>{{ r.title }} · {{ r.item_id }}</h3><p><strong>Pregunta:</strong> {{ r.question }}</p>
+{% for r in rows %}<article id="q-{{ r.id }}"><h3>{{ r.title }} · {{ r.item_id }}</h3><p><strong>Pregunta:</strong> {{ r.question }}</p>
+<p>Origen del borrador: {% if drafts.get(r.id) %}{{ drafts[r.id].state }} {{ drafts[r.id].error or '' }}{% else %}reglas conservadoras; IA aún no consultada{% endif %}. Siempre requiere tu revisión.</p>
 <p>Estado externo: {{ r.external_status }} · Revisión: {{ r.status }} · Actualización: {{ r.updated }}</p>
 {% if r.external_answer %}<p>Respuesta ya publicada: {{ r.external_answer }}</p>{% endif %}
 <p><strong>Datos públicos utilizados:</strong> {% for k,v in r.used.items() %}{{ k }}: {{ v }}; {% else %}No hay atributos suficientes.{% endfor %}</p>
@@ -28,5 +48,5 @@
 {% if r.examples %}<details><summary>Ejemplos aprobados para esta publicación</summary>{% for e in r.examples %}<p>{{ e.question }} → {{ e.after_text }}</p>{% endfor %}<p>Usalos como referencia. No se aplican automáticamente a otras preguntas, packs o productos.</p></details>{% endif %}
 </article>{% else %}<p>No hay preguntas cargadas. Consultá la API o importá un archivo.</p>{% endfor %}
 <section><h2>Historial de decisiones y correcciones</h2>{% for h in history %}<details><summary>{{ h.created }} · {{ h.item_id }} · {{ h.action }}</summary><p>Pregunta: {{ h.question }}</p><p>Antes: {{ h.before_text }}</p><p>Después: {{ h.after_text }}</p></details>{% else %}<p>Sin decisiones.</p>{% endfor %}<p>Se muestran las últimas 100 decisiones; el registro completo permanece en la base de revisión.</p></section>
-<section><h2>Próximas etapas</h2><p>Rentabilidad y costos, stock y producción: herramientas existentes; integración a recomendaciones pendiente. Catálogo, Ads, Full/Flex y reputación: pendientes de fuentes y desarrollo. Coordinador y resumen diario: pendientes. No se muestran resultados simulados como análisis reales.</p></section>
+<section><h2>Otros asistentes pausados</h2><p>Rentabilidad, producción y demás asistentes quedan fuera de esta automatización.</p></section>
 </main></body></html>
