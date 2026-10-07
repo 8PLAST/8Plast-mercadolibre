@@ -166,7 +166,7 @@ def fetch_questions(token_provider, item_loader=None):
         except QueryFailure as exc:
             if exc.code not in ('NOT_FOUND', 'PERMISSION_DENIED', 'POLICY_DENIED'): raise
             publications[item_id] = {}
-            warnings.append(exc.public_message() + ' La pregunta se cargó sin atributos; requiere confirmar el producto.')
+            warnings.append(f'Publicación {item_id}: {exc.code} HTTP {exc.status}. Pregunta cargada; atributos no accesibles, revisión necesaria.')
     return {'questions': questions, 'publications': publications}, warnings
 
 
@@ -223,6 +223,8 @@ class ReviewStore:
             for name in ('attempted', 'warning'):
                 if name not in columns:
                     con.execute(f'ALTER TABLE sync ADD COLUMN {name} TEXT')
+            if 'external_created' not in {r[1] for r in con.execute('PRAGMA table_info(questions)')}:
+                con.execute('ALTER TABLE questions ADD COLUMN external_created TEXT')
 
     @contextmanager
     def connect(self):
@@ -260,11 +262,24 @@ class ReviewStore:
                 if existing and (existing['item_id'] != values[1] or existing['question'] != text):
                     raise ValueError('Un ID existente no puede cambiar de pregunta o publicación.')
                 if existing:
-                    con.execute('UPDATE questions SET external_status=?, external_answer=?, updated=? WHERE id=?',
-                        (values[4], values[5], values[-1], values[0]))
+                    con.execute('UPDATE questions SET external_status=?, external_answer=?, updated=?, external_created=? WHERE id=?',
+                        (values[4], values[5], values[-1],str(q.get('date_created','')), values[0]))
+                    if facts != json.loads(existing['facts']) or values[2] != existing['title']:
+                        con.execute('UPDATE questions SET facts=?,title=? WHERE id=?',(json.dumps(facts),values[2],values[0]))
+                        if existing['status']=='PENDIENTE' and not existing['edited'] and not existing['approved']:
+                            con.execute('UPDATE questions SET original=?,used=?,missing=?,version=version+1 WHERE id=?',
+                                (draft,json.dumps(used),json.dumps(missing),values[0]))
+                            if con.execute("SELECT 1 FROM sqlite_master WHERE name='assistant_drafts'").fetchone():
+                                con.execute('DELETE FROM assistant_drafts WHERE question_id=?',(values[0],))
+                        elif facts != json.loads(existing['facts']):
+                            missing = json.loads(existing['missing'])
+                            note = 'Datos de la publicación cambiaron; revisar tu versión guardada'
+                            if note not in missing: missing.append(note)
+                            con.execute('UPDATE questions SET missing=? WHERE id=?',(json.dumps(missing),values[0]))
                 else:
                     con.execute('INSERT INTO questions(id,item_id,title,question,external_status,external_answer,facts,original,missing,used,updated) VALUES (?,?,?,?,?,?,?,?,?,?,?)', values)
                     count += 1
+                    con.execute('UPDATE questions SET external_created=? WHERE id=?',(str(q.get('date_created','')),values[0]))
             con.execute('INSERT INTO sync(id,success,error,source) VALUES(1,?,NULL,?) ON CONFLICT(id) DO UPDATE SET success=excluded.success,error=NULL,source=excluded.source', (now(), source))
         return count
 
@@ -313,7 +328,7 @@ def register_center(app, review_path, token_provider=None):
         from assistant_automation import status, INTERVAL
         monitor, alerts = status(store)
         with store.connect() as con:
-            rows = [dict(r) for r in con.execute('SELECT * FROM questions ORDER BY updated DESC')]
+            rows = [dict(r) for r in con.execute("SELECT * FROM questions ORDER BY (external_status='UNANSWERED') DESC, julianday(external_created) DESC, updated DESC")]
             history = [dict(r) for r in con.execute('SELECT d.*,q.item_id,q.question FROM decisions d JOIN questions q ON q.id=d.question_id ORDER BY d.id DESC LIMIT 100')]
             sync = con.execute('SELECT * FROM sync WHERE id=1').fetchone()
             drafts = {r['question_id']:dict(r) for r in con.execute('SELECT * FROM assistant_drafts')}

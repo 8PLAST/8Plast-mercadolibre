@@ -10,7 +10,7 @@
 <p>Último intento: {{ (sync.attempted or 'Sin intentos registrados') if sync else 'Sin intentos registrados' }}</p>
 {% if connection_message %}<p role="alert" class="notice">{{ connection_message }} <a href="https://8plast-mercadolibre-webhook-production.up.railway.app/asistentes">Abrir centro en Railway</a>. Si esa ruta no existe, falta desplegar esta versión con autorización.</p>{% endif %}
 {% if sync and sync.error %}<p role="alert">{{ sync.error }}</p>{% endif %}
-{% if sync and sync.warning %}<p role="alert">{{ sync.warning }}</p>{% endif %}
+{% if sync and sync.warning %}<details><summary>Advertencias de la consulta: revisar datos y cobertura</summary><p role="alert">{{ sync.warning }}</p></details>{% endif %}
 <form action="/asistentes/consultar" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if not connection_ready %}disabled{% endif %}>Consultar preguntas en Mercado Libre</button></form>
 <form action="/asistentes/importar" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Preguntas y atributos públicos en JSON <input type="file" name="file" accept=".json" required></label><button>Importar archivo</button></form>
 <p>La consulta incluye hasta 200 preguntas. No garantiza historial completo. Los archivos deben contener datos públicos verificados, sin credenciales.</p></section>

@@ -126,5 +126,18 @@ class AutomationTests(unittest.TestCase):
         self.assertEqual(payload['publications']['MLA123'],{})
         self.assertIn('POLICY_DENIED',warnings[0])
 
+    def test_new_product_evidence_updates_without_losing_approval(self):
+        self.store.ingest(self.payload(),'test')
+        self.store.decide('1','APROBADA','Aprobación humana',1)
+        changed=self.payload()
+        changed['publications']['MLA123']['attributes'][0]['value_name']='100'
+        changed['publications']['MLA123']['title']='Título verificado'
+        self.store.ingest(changed,'refresh')
+        q=self.read('questions')[0]
+        self.assertEqual(q['approved'],'Aprobación humana')
+        self.assertEqual(q['edited'],'Aprobación humana')
+        self.assertEqual(json.loads(q['facts'])['unidades_pack'],'100')
+        self.assertEqual(q['title'],'Título verificado')
+
 
 if __name__=='__main__': unittest.main()
