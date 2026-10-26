@@ -4,6 +4,7 @@ import base64
 import ctypes
 import json
 import os
+import re
 import tempfile
 import secrets
 import threading
@@ -136,6 +137,9 @@ class MercadoLibreClient:
         if cloud_mode() and not sync_owner():
             raise MercadoLibreError('Railway está en espera: la sincronización sigue siendo local.')
         headers={"Accept":"application/json","User-Agent":"8PlastStock/1.0"}
+        path=urllib.parse.urlparse(url).path
+        if re.fullmatch(r'/shipments/\d+',path): headers['x-format-new']='true'
+        if re.fullmatch(r'/orders/\d+/shipments',path): headers['X-New-Domain']='true'
         if token: headers["Authorization"] = f"Bearer {token}"
         encoded = urllib.parse.urlencode(data).encode() if data is not None else None
         if encoded is not None: headers["Content-Type"]="application/x-www-form-urlencoded"
@@ -185,6 +189,39 @@ class MercadoLibreClient:
         return "Credenciales guardadas; falta autorizar" if self.configured() else "Sin configurar"
 
     def get_order(self, order_id): return self._request(f"{API_URL}/orders/{order_id}", token=self.access_token())
+
+    def resolve_shipping_logistics(self, order):
+        """Solo GET; la logística del envío, nunca la de la publicación."""
+        shipping=order.get('shipping') or {}
+        shipment_id=shipping.get('id')
+        if shipment_id is None:
+            oid=str(order.get('id',''))
+            if not oid.isdigit(): raise MercadoLibreError('ID de orden inválido para consultar envíos')
+            response=self._request(f'{API_URL}/orders/{oid}/shipments',token=self.access_token())
+            if isinstance(response,list):
+                forward=[r for r in response if isinstance(r,dict) and r.get('type')=='forward']
+                if len(forward)!=1: raise MercadoLibreError('Envío forward no identificable')
+                shipping=forward[0]
+            elif isinstance(response,dict) and response.get('type')=='forward': shipping=response
+            else: raise MercadoLibreError('Formato de envío forward no verificable')
+            shipment_id=shipping.get('id') or shipping.get('shipment_id')
+        if not str(shipment_id or '').isdigit():
+            raise MercadoLibreError('No hay envío verificable; no se presume despacho propio')
+        response=self._request(f'{API_URL}/shipments/{shipment_id}',token=self.access_token())
+        if not isinstance(response,dict) or str(response.get('id'))!=str(shipment_id):
+            raise MercadoLibreError('El detalle del envío no coincide')
+        node=response.get('logistic') or {}
+        if not isinstance(node,dict): raise MercadoLibreError('Nodo logístico inválido')
+        if node.get('direction') not in (None,'forward'):
+            raise MercadoLibreError('El envío consultado no es forward')
+        logistic=response.get('logistic_type')
+        nested=node.get('type')
+        if logistic and nested and str(logistic).lower()!=str(nested).lower():
+            raise MercadoLibreError('Logística contradictoria en el envío')
+        if not logistic: logistic=nested
+        if not isinstance(logistic,str) or not logistic.strip():
+            raise MercadoLibreError('El envío no informa logística verificable')
+        return logistic.strip().lower()
 
     def _seller_id(self):
         secure=self.secure_config(); user_id=secure.get("user_id")
@@ -242,7 +279,7 @@ class MercadoLibreClient:
         created=self._recover_stream("CREATED","date_created",cutoff)
         updated=self._recover_stream("UPDATED","date_last_updated",cutoff)
         self.db.retry_marketplace_inbox_errors()
-        processing=self.db.process_marketplace_inbox()
+        processing=self.db.process_marketplace_inbox(shipping_resolver=self.resolve_shipping_logistics)
         return {"cutoff":self._iso(cutoff),"created":created,"updated":updated,"processing":processing}
 
     def sync_recent_orders(self):

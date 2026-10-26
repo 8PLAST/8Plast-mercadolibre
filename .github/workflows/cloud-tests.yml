@@ -11,5 +11,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: python -m unittest test_production_recommended test_stock_objectives test_marketplace_analytics test_product_planning test_cloud_runtime test_stock test_ml_tokens test_assistant_center test_assistant_automation webhook_server.test_webhook -v
+      - run: python -m unittest test_full_stock_policy test_production_recommended test_stock_objectives test_marketplace_analytics test_product_planning test_cloud_runtime test_stock test_ml_tokens test_assistant_center test_assistant_automation webhook_server.test_webhook -v
       - run: python tools/smoke_cloud.py

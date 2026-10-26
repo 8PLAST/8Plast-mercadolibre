@@ -65,7 +65,7 @@ def create_app(config=None):
             with db.session() as con: con.execute('SELECT 1 FROM products LIMIT 1').fetchone()
             status=json.loads((Path(db.path).parent/'worker_status.json').read_text())
             fresh=0 <= time.time()-status['time'] < 900 and status['state'] in ('standby','running')
-            return {'status':'ok' if fresh else 'degraded','worker':status['state'],'sync_enabled':sync_owner()}, 200 if fresh else 503
+            return {'status':'ok' if fresh else 'degraded','worker':status['state'],'sync_enabled':sync_owner(),'full_stock_effective_from':status.get('full_stock_effective_from')}, 200 if fresh else 503
         except (OSError,ValueError,KeyError,TypeError,sqlite3.Error): return {'status':'starting'},503
     app.view_functions['health']=health
 

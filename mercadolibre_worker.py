@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from db import Database
+from full_stock_policy import activate_once, activation
 from ml_integration import MercadoLibreClient
 from runtime_config import cloud_mode, data_dir, file_lock, sync_owner
 
@@ -28,7 +29,8 @@ def log(event,**data):
 def heartbeat(state, **extra):
     directory=data_dir(); directory.mkdir(parents=True,exist_ok=True)
     temporary=directory/'worker_status.tmp'
-    temporary.write_text(json.dumps({'time':time.time(),'state':state,'pid':os.getpid(),**extra}),encoding='utf-8')
+    effective=activation(directory/'8plast_stock.db')
+    temporary.write_text(json.dumps({'time':time.time(),'state':state,'pid':os.getpid(),'full_stock_effective_from':effective.isoformat() if effective else None,**extra}),encoding='utf-8')
     os.replace(temporary,directory/'worker_status.json')
 
 def process_notifications(db, client):
@@ -49,7 +51,7 @@ def process_notifications(db, client):
 
 def run():
     with file_lock(LOCK):
-        db=Database(); client=MercadoLibreClient(db); next_poll=0; next_queue=0; worker_state='running'
+        db=Database(); effective=activate_once(db.path); log('full_stock_policy_active',effective_from=effective.isoformat()); client=MercadoLibreClient(db); next_poll=0; next_queue=0; worker_state='running'
         log('worker_started')
         while True:
             config=db.marketplace_processing_config()
@@ -67,7 +69,7 @@ def run():
                     heartbeat(worker_state,last_success=time.time())
                 if time.monotonic()>=next_queue:
                     process_notifications(db,client)
-                    result=db.process_marketplace_inbox()
+                    result=db.process_marketplace_inbox(shipping_resolver=client.resolve_shipping_logistics)
                     if result['pending']: log('notifications_processed',summary=result)
                     next_queue=time.monotonic()+10
             except Exception as exc:

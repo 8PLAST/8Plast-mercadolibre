@@ -28,3 +28,6 @@ tools/ngrok/
 !.env.example
 .ml_secure_*
 .meli-*
+
+full_stock_policy.json
+full_stock_policy.tmp

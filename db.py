@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from stock_rules import production_needed, stock_state
+from full_stock_policy import activation as full_activation
 from marketplace_analytics import marketplace_metrics, marketplace_statistics
 from runtime_config import database_path
 
@@ -731,11 +732,11 @@ class Database:
                 stored += 1
         return stored
 
-    def process_marketplace_inbox(self) -> dict:
+    def process_marketplace_inbox(self, shipping_resolver=None) -> dict:
         """Procesa la bandeja sin dejar que una falta de stock bloquee otras ventas."""
         summary = {"pending": 0, "resolved": 0, "processed": 0, "duplicates": 0,
                    "excluded": 0, "unassociated": 0, "cancellations_pending": 0,
-                   "cancellation_repeats": 0, "errors": []}
+                   "cancellation_repeats": 0, "full_skipped": 0, "errors": []}
         with self.session() as con:
             rows = con.execute("""SELECT id,order_id,date_created,payload_json FROM marketplace_order_inbox
                 WHERE marketplace='MERCADOLIBRE' AND processing_status='PENDING'
@@ -743,9 +744,11 @@ class Database:
         summary["pending"] = len(rows)
         for row in rows:
             try:
-                result = self.process_marketplace_order(json.loads(row["payload_json"]))
+                result = self.process_marketplace_order(json.loads(row["payload_json"]), shipping_resolver=shipping_resolver)
                 status = "PROCESSED" if result["processed"] else "RESOLVED"
-                if result["cancellations_pending"] or result["cancellation_repeats"]:
+                if result["full_skipped"]:
+                    status = "FULL_NO_STOCK"
+                elif result["cancellations_pending"] or result["cancellation_repeats"]:
                     status = "CANCEL_REVIEW"
                 elif result["excluded"]:
                     status = "EXCLUDED"
@@ -757,7 +760,7 @@ class Database:
                     con.execute("""UPDATE marketplace_order_inbox SET processing_status=?,attempts=attempts+1,
                         processed_at=?,last_error=NULL WHERE id=?""", (status,now_text(),row["id"]))
                 summary["resolved"] += 1
-                for key in ("processed","duplicates","cancellations_pending","cancellation_repeats"):
+                for key in ("processed","duplicates","cancellations_pending","cancellation_repeats","full_skipped"):
                     summary[key] += result[key]
                 summary["excluded"] += len(result["excluded"])
                 summary["unassociated"] += len(result["unassociated"])
@@ -850,7 +853,7 @@ class Database:
             WHERE ml.marketplace='MERCADOLIBRE' AND ml.listing_id=? AND ml.variation_id=? AND ml.active=1""",
             (listing_id.upper(), variation_id)).fetchone()
 
-    def process_marketplace_order(self, order: dict) -> dict:
+    def process_marketplace_order(self, order: dict, shipping_resolver=None) -> dict:
         """Aplica una orden obtenida de ML. Es idempotente y nunca cambia cantidades publicadas."""
         order_id = str(order.get("id", ""))
         if not order_id: raise StockError("La orden no tiene ID.")
@@ -858,8 +861,24 @@ class Database:
         is_cancelled = status == "cancelled"
         result = {"processed": 0, "duplicates": 0, "skipped_before_start": 0,
                   "skipped_missing_date": 0, "unassociated": [], "excluded": [],
-                  "cancellations_pending": 0, "cancellation_repeats": 0, "cancelled": is_cancelled}
+                  "cancellations_pending": 0, "cancellation_repeats": 0, "cancelled": is_cancelled, "full_skipped": 0}
         order_date = self._parse_external_date(order.get("date_created") or order.get("date_closed"))
+        effective=full_activation(self.path)
+        if effective is not None and status in ('paid','confirmed'):
+            if order_date is None:
+                raise StockError('No se puede verificar vigencia Full: orden sin fecha válida')
+            if order_date >= effective:
+                if shipping_resolver is None:
+                    raise StockError('Logística pendiente de verificar; no se descontó stock')
+                try:
+                    logistic_type=shipping_resolver(order)
+                except Exception as exc:
+                    raise StockError('No se pudo verificar logística del envío; pendiente sin descuento') from exc
+                if logistic_type=='fulfillment':
+                    result['full_skipped']=len(order.get('order_items') or [])
+                    return result
+                if logistic_type not in {'self_service','drop_off','cross_docking','xd_drop_off','default','custom','turbo','seller_pickup'}:
+                    raise StockError('Logística desconocida; pendiente sin descuento')
         for index, order_item in enumerate(order.get("order_items") or []):
             item = order_item.get("item") or {}
             listing_id = str(item.get("id") or "").upper()

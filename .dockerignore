@@ -22,3 +22,6 @@ outputs
 tools/ngrok
 .codex_tmp_sheetread
 backups
+
+full_stock_policy.json
+full_stock_policy.tmp
