@@ -1,0 +1,10 @@
+/* Etapa 1: lectura de recomendaciones sin alterar los niveles existentes. */
+.objective-notice { padding:16px; margin:16px 0; border:1px solid #9fb8c4; border-radius:12px; background:#f0f7fa; line-height:1.5; }
+.objective-notice small { display:block; overflow-wrap:anywhere; }
+.objective-detail { min-width:220px; max-width:360px; white-space:normal; line-height:1.5; }
+.objective-detail summary { cursor:pointer; min-height:44px; }
+.objective-detail ul { padding-left:20px; }
+@media(max-width:600px) { .objective-notice {padding:12px;} .objective-detail {min-width:180px;} }
+.stock-table td { vertical-align:top; } .objective-detail[open] { max-height:350px; overflow:auto; }
+
+.estimate-label {display:block;font-size:10px;color:#705800;margin-top:5px;}

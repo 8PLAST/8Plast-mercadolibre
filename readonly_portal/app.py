@@ -8,6 +8,7 @@ from runtime_config import database_path
 from flask import Flask, abort, render_template, request
 
 from stock_rules import priority_sql, state_sql
+from stock_objectives import stock_objectives
 from marketplace_analytics import marketplace_metrics, marketplace_statistics, PRIORITY_ORDER
 from product_planning import build_production_plan, FAMILY_LABELS, PRODUCTION_ORDER
 
@@ -138,6 +139,12 @@ def create_app(config=None):
         products=rows(f"""SELECT p.*,{expression} state,
           CASE WHEN p.target_stock>0 THEN MAX(p.target_stock-p.stock,0) END missing FROM products p
           WHERE {' AND '.join(where)} ORDER BY {sortable.get(order,sortable['product'])} {direction},p.name COLLATE NOCASE""",args)
+        con=connect_readonly(app.config["DATABASE_PATH"])
+        try:
+            objectives=stock_objectives(con)
+        finally:
+            con.close()
+        products=[dict(p, objective=objectives[p['id']]) for p in products]
         return render_template("products.html",page="bags" if kind=="BAG" else "rolls",kind=kind,
             products=products,counts=counts(kind),search=search,state=state,color=color,bag_colors=BAG_COLORS,
             roll_microns=roll_microns,roll_micron_tabs=ROLL_MICRONS,sort=order,direction=direction.lower())
