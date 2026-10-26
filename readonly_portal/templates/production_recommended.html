@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block content %}
+<section class="recommended-page">
+<div class="recommended-title"><div><h1>PRODUCCIÓN RECOMENDADA</h1><p>Qué fabricar y en qué cantidad · propuesta orientativa, sin órdenes automáticas</p></div><a class="export-plan" href="{{ url_for('recommended_production',**export_args) }}">Exportar planificación CSV</a></div>
+<div class="objective-notice">
+<strong>Tu producción ingresada actualiza este plan</strong>
+<p>Al registrar producción en «Agregar inventario», se incorpora al stock y el cálculo se rehace en la próxima actualización. Esta página se actualiza cada minuto cuando no estás editando filtros o una simulación; también podés usar «Actualizar». No hace falta volver a informar esa producción como pendiente.</p>
+<p>Se usan las ventas verificadas de 90 días y el objetivo aprobado de 15 días, incluidos 5 de fabricación. Cantidad = objetivo − (stock físico − reservas adicionales − ventas previstas en 5 días) − ingresos pendientes hasta el día 5. Una proyección negativa conserva el faltante previsto. Nunca se recomienda una cantidad negativa.</p>
+<p>Sin registro de pendientes o reservas, se muestra un escenario sobre stock físico, sin esos ajustes. Podés simularlos abajo. Las reservas adicionales son solo las que todavía no se descontaron del stock; los pendientes son solo los que todavía no ingresaron.</p>
+<small>Última actualización: {{ updated }} (Buenos Aires) · Sincronización de ventas: {{ last_sync or 'Sin verificar' }}. Disponibilidad histórica y devoluciones siguen sujetas a las advertencias de la etapa 1.</small>
+</div>
+<div class="recommended-kpis"><article><span>Productos en esta vista</span><strong>{{ plan|length }}</strong></article><article><span>Bolsas sugeridas · escenario actual</span><strong>{{ totals.BAG }}</strong></article><article><span>Rollos sugeridos · escenario actual</span><strong>{{ totals.ROLL }}</strong></article></div>
+<form class="filters recommended-filters" method="get">
+<label>Buscar<input name="q" value="{{ search }}" placeholder="Medida, nombre o SKU"></label>
+<label>Color<select name="color"><option value="">Todos</option>{% for c in colors %}<option value="{{ c }}" {{ 'selected' if color==c }}>{{ c }}</option>{% endfor %}</select></label>
+<label>Tipo de producto<select name="family">{% for key,label in families.items() %}<option value="{{ key }}" {{ 'selected' if family==key }}>{{ label }}</option>{% endfor %}</select></label>
+<label>Prioridad<select name="priority"><option value="">Todas</option>{% for level in priorities %}<option {{ 'selected' if priority==level }}>{{ level }}</option>{% endfor %}</select></label>
+{% for key,value in scenario_values.items() %}{% if value %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+<button>Filtrar</button><a href="{{ url_for('recommended_production') }}">Limpiar filtros y simulación</a>
+</form>
+{% if scenario_invalidated %}<p role="status" class="objective-notice">La simulación anterior se descartó porque cambió el inventario. El plan se recalculó sobre el stock actual. Si todavía queda producción pendiente, ingresá solo la parte que aún no recibiste.</p>{% endif %}
+<details class="recommended-scenario" {{ 'open' if selected }}><summary>Simular reservas o producción todavía pendiente de ingreso</summary>
+<p>La simulación no registra órdenes ni modifica stock y se conserva en esta vista y su exportación. Volvé a verificarla al ingresar la producción; usá «Limpiar» para retirarla. No se comparte entre usuarios ni se guarda como pendiente real.</p>
+<form method="get" class="recommended-filters"><input type="hidden" name="scenario_snapshot" value="{{ scenario_values.scenario_snapshot }}">
+<input type="hidden" name="q" value="{{ search }}"><input type="hidden" name="color" value="{{ color }}"><input type="hidden" name="family" value="{{ family }}"><input type="hidden" name="priority" value="{{ priority }}">
+<label>Producto a simular<select name="scenario_product" required><option value="">Elegir producto</option>{% for p in products %}<option value="{{ p.id }}" {{ 'selected' if selected and selected.id==p.id }}>{{ p.sku }} · {{ p.name }}</option>{% endfor %}</select></label>
+<label>Reservas adicionales · unidades<input name="reserved" type="number" min="0" max="1000000000" step="1" value="{{ scenario_values.reserved }}" placeholder="Sin verificar"></label>
+<label>Pendiente aún no ingresado · unidades<input name="pending" type="number" min="0" max="1000000000" step="1" value="{{ scenario_values.pending }}" placeholder="Sin verificar"></label>
+<label>Días hasta ese ingreso<input name="pending_day" type="number" min="0" max="365" step="1" value="{{ scenario_values.pending_day or 5 }}"></label><button>Recalcular simulación</button>
+</form><p>En blanco = desconocido. Cero = sin reservas o pendientes en este escenario. Pendientes que lleguen después del día 5 se muestran, pero no se descuentan de esta reposición.</p>
+</details>
+{% if selected %}<p role="status" class="objective-notice">Simulación activa para {{ selected.name }}. Revisala antes de fabricar y después de registrar nuevos ingresos. El resto de los productos conserva el escenario sobre saldo físico.</p>{% endif %}
+<div class="table-wrap recommended-table-wrap"><table class="recommended-table"><thead><tr><th>Producto y variante</th><th>Stock disponible actual</th><th>Promedio mensual</th><th>Objetivo recomendado</th><th>Fabricar · unidades</th><th>Días hasta agotamiento</th><th>Prioridad</th><th>Estado de reposición</th><th>Detalle</th></tr></thead><tbody>
+{% for p in plan %}<tr class="recommended-{{ p.priority|lower|replace(' ','-') }}">
+<td data-label="Producto y variante"><a href="{{ url_for('product_history',product_id=p.id) }}">{{ p.name }}</a><small>{{ p.sku }} · {{ p.color_material }} · {{ p.family_label }}</small></td>
+<td data-label="Stock disponible actual"><strong>{{ p.available_stock if p.available_stock is not none else '—' }}</strong><small>Físico: {{ p.stock }} {{ 'rollos' if p.kind=='ROLL' else 'bolsas' }}</small>{% if p.reserved is none %}<small>Reservas sin verificar</small>{% else %}<small>Reservas adicionales: {{ p.reserved }}</small>{% endif %}</td>
+<td data-label="Promedio mensual">{{ '%.1f'|format(p.monthly_average) }}<small>Ventas verificadas de 90 días ÷ 3</small></td>
+<td data-label="Objetivo recomendado">{{ p.objective.target_recommended if p.objective.target_recommended is not none else '—' }}<small>{{ 'rollos' if p.kind=='ROLL' else 'bolsas' }} · 15 días</small></td>
+<td data-label="Fabricar · unidades"><strong>{{ p.suggested if p.suggested is not none else '—' }}</strong>{% if p.packs is not none %}<small>{{ p.packs }} packs completos de {{ p.storage_pack }} ({{ p.packs*p.storage_pack }} unidades)</small>{% endif %}<small>Orientativo{% if selected and selected.id==p.id %} · simulación{% endif %}</small></td>
+<td data-label="Días hasta agotamiento">{{ '%.1f'|format(p.days_to_stockout) if p.days_to_stockout is not none else 'No evaluable' }}<small>Según demanda media; ingresos conocidos hasta día 5</small></td>
+<td data-label="Prioridad"><span class="recommended-priority">{{ p.priority }}</span></td>
+<td data-label="Estado de reposición">{{ p.replenishment_state }}</td>
+<td data-label="Detalle"><details><summary>Ver cálculo y advertencias</summary><div class="recommended-calculation">
+{% if p.projected_stock is not none %}<p>Proyección al recibir, antes de pendientes: {{ '%.2f'|format(p.projected_stock) }}. Objetivo {{ p.objective.target_recommended }} − proyección {{ '%.2f'|format(p.projected_stock) }} − pendiente aplicable {{ p.pending_due }} = {{ p.suggested }} a fabricar (redondeo hacia arriba; mínimo cero).</p>{% endif %}
+<p>Pendiente hasta día 5: {{ p.pending_due if p.pending_known else 'Sin verificar' }}. Posterior: {{ p.pending_later if p.pending_known else 'Sin verificar' }}. Los ingresos ya sumados al stock no se restan nuevamente.</p>
+<p>Los packs se redondean hacia arriba como opción de fabricación; la cantidad exacta sugerida está en unidades. No se suman bolsas y rollos.</p>
+<ul>{% for warning in p.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div></details></td>
+</tr>{% else %}<tr><td colspan="9">No hay productos para estos filtros.</td></tr>{% endfor %}
+</tbody></table></div>
+</section>{% endblock %}

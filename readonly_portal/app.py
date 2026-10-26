@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import os
+import csv
+import io
+import hashlib
+from datetime import datetime
 import sqlite3
 from pathlib import Path
 from runtime_config import database_path
 
-from flask import Flask, abort, render_template, request
+from flask import Flask, abort, render_template, request, Response
 
 from stock_rules import priority_sql, state_sql
-from stock_objectives import stock_objectives
+from stock_objectives import stock_objectives, LOCAL
+from production_recommended import build_recommended_plan, PRIORITIES, spreadsheet_safe
 from marketplace_analytics import marketplace_metrics, marketplace_statistics, PRIORITY_ORDER
 from product_planning import build_production_plan, FAMILY_LABELS, PRODUCTION_ORDER
 
@@ -171,6 +176,69 @@ def create_app(config=None):
         actionable=[p for p in products if p["production_priority"] not in {"NO REQUIERE PRODUCCIÓN","DATOS INCOMPLETOS"}]
         totals={"bags":sum(p["suggested"] for p in actionable if p["kind"]=="BAG"),"rolls":sum(p["suggested"] for p in actionable if p["kind"]=="ROLL")}
         return render_template("replenishment.html",page="replenishment",products=products,top=actionable[:5],search=request.args.get("q",""),family=family,level=level,sort=sort,families=FAMILY_LABELS,family_counts=family_counts,totals=totals,critical_count=sum(p.get("coverage") is not None and p["coverage"]<7 for p in products))
+
+    @app.get("/produccion-recomendada")
+    def recommended_production():
+        search=request.args.get('q','').strip()
+        color=request.args.get('color','')
+        family=request.args.get('family','TODOS')
+        priority=request.args.get('priority','')
+        con=connect_readonly(app.config['DATABASE_PATH'])
+        try:
+            con.execute('BEGIN')
+            products=[dict(p) for p in con.execute('SELECT * FROM products WHERE active=1')]
+            objectives=stock_objectives(con)
+            movement_version=con.execute('SELECT COALESCE(MAX(id),0) FROM stock_movements').fetchone()[0]
+        finally: con.close()
+        snapshot=hashlib.sha256(repr((movement_version, sorted((p['id'],p['stock']) for p in products))).encode()).hexdigest()
+        scenario_invalidated=bool(request.args.get('scenario_product') and request.args.get('scenario_snapshot') and request.args.get('scenario_snapshot')!=snapshot)
+        colors=sorted({p['color_material'] for p in products if p['color_material']},key=str.casefold)
+        contexts={}
+        selected=None
+        scenario_error=None
+        raw_pid=request.args.get('scenario_product','')
+        if raw_pid and not scenario_invalidated:
+            try:
+                pid=int(raw_pid)
+                selected=next((p for p in products if p['id']==pid),None)
+                if selected is None: raise ValueError('Producto de simulación inexistente')
+                reserved_text=request.args.get('reserved','').strip()
+                pending_text=request.args.get('pending','').strip()
+                day_text=request.args.get('pending_day','5').strip() or '5'
+                reserved=int(reserved_text) if reserved_text else None
+                pending=int(pending_text) if pending_text else None
+                day=int(day_text)
+                if any(x is not None and (x<0 or x>1000000000) for x in (reserved,pending)) or not 0<=day<=365:
+                    raise ValueError('Revisá cantidades y plazo: unidades no negativas y plazo de 0 a 365 días')
+                receipts=None if pending is None else ([] if pending==0 else [dict(id='simulation',quantity=pending,days=day)])
+                contexts[pid]=dict(reserved=reserved,receipts=receipts)
+            except ValueError as exc: abort(400,description=str(exc))
+        plan=build_recommended_plan(products,objectives,contexts)
+        if scenario_invalidated and raw_pid:
+            for p in plan: p['warnings'].append('Simulación descartada porque cambió el inventario; pendientes y reservas requieren nueva revisión')
+        if search:
+            plan=[p for p in plan if search.casefold() in f"{p['name']} {p['sku']} {p['width_cm']}x{p.get('length_cm')}".casefold()]
+        if color: plan=[p for p in plan if p['color_material']==color]
+        if family!='TODOS': plan=[p for p in plan if p['family']==family]
+        if priority: plan=[p for p in plan if p['priority']==priority]
+        updated=datetime.now(LOCAL).strftime('%d/%m/%Y %H:%M:%S')
+        export_args=request.args.to_dict(); export_args['export']='csv'
+        if not scenario_invalidated: export_args['scenario_snapshot']=snapshot
+        if request.args.get('export')=='csv':
+            output=io.StringIO(newline=''); writer=csv.writer(output,delimiter=';')
+            writer.writerow(['Actualización Buenos Aires','SKU','Producto y variante','Color','Tipo','Stock físico','Disponible calculado','Reservas adicionales','Venta mensual promedio (90d/3)','Objetivo recomendado','Proyección sin pendientes día 5','Pendiente hasta día 5','Pendiente posterior','Fabricar unidades','Packs completos sugeridos','Unidades por pack','Días hasta agotamiento','Prioridad','Estado de reposición','Calidad','Advertencias'])
+            for p in plan:
+                values=[updated,p['sku'],p['name'],p['color_material'],p['family_label'],p['stock'],p['available_stock'],p['reserved'],round(p['monthly_average'],2),p['objective']['target_recommended'],round(p['projected_stock'],2) if p['projected_stock'] is not None else None,p['pending_due'] if p['pending_known'] else None,p['pending_later'] if p['pending_known'] else None,p['suggested'],p['packs'],p.get('storage_pack') if p['kind']=='BAG' else None,round(p['days_to_stockout'],2) if p['days_to_stockout'] is not None else None,p['priority'],p['replenishment_state'],'Orientativo' if p['provisional'] else 'Verificado',' | '.join(p['warnings'])]
+                writer.writerow([spreadsheet_safe(v) if isinstance(v,str) else ('' if v is None else v) for v in values])
+            return Response('\ufeff'+output.getvalue(),mimetype='text/csv; charset=utf-8',headers={'Content-Disposition':'attachment; filename="8plast_produccion_recomendada.csv"'})
+        totals={kind:sum(p['suggested'] or 0 for p in plan if p['kind']==kind) for kind in ('BAG','ROLL')}
+        return render_template('production_recommended.html',page='recommended_production',plan=plan,
+            products=sorted(products,key=lambda p:p['name'].casefold()),colors=colors,families=FAMILY_LABELS,
+            priorities=PRIORITIES,search=search,color=color,family=family,priority=priority,
+            selected=selected,updated=updated,export_args=export_args,totals=totals,
+            scenario_invalidated=scenario_invalidated and bool(raw_pid),
+            scenario_values={**{k:('' if scenario_invalidated else request.args.get(k,'')) for k in ('scenario_product','reserved','pending','pending_day')},'scenario_snapshot':snapshot},
+            last_sync=next((o['last_sync'] for o in objectives.values() if o['last_sync']),None))
 
     @app.get("/mercadolibre")
     def marketplace():
