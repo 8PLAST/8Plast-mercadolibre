@@ -77,6 +77,8 @@ def evidence(store,item_id,public_facts=None):
                **{k:val for k,val in family.items() if k not in ('variants','id','name')},**v}
     if family['kind']=='rolls':
         confirmed['material']=details['material'];confirmed['meters_total']=details['meters_total']
+    for key in ('units_per_pack','publication_title'):
+        if key in details:confirmed[key]=details[key]
     warnings=[]
     public_facts=public_facts or {}
     conflicts=[]
@@ -107,4 +109,3 @@ def evidence(store,item_id,public_facts=None):
            'authority':'owner_catalog','value':confirmed}
     return {'version':catalog['version'],'rules':catalog['rules'],'identity_confirmed':True,
             'warnings':warnings,'knowledge':[entry]}
-

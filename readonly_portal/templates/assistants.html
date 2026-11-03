@@ -4,6 +4,7 @@
 <body><main><a href="/">← Inventario</a><h1>Centro de asistentes</h1>
 <p class="notice">Sugerencias automáticas en Asistentes. Si te sirve, aprobala para publicar. Si no, respondé directamente en Mercado Libre: recuperaremos tu respuesta para futuras sugerencias.</p>
 <p>IA: {{ 'clave configurada; consultar el estado de cada borrador' if ai_configured else 'pendiente: falta OPENAI_API_KEY en Railway; se usan reglas conservadoras' }}. La información interna de producción no se usa para responder clientes.</p>
+{% if ai_control.blocked_error %}<p role="alert" class="notice">Generación pausada: {{ 'La cuenta de API de OpenAI no tiene saldo. Cargá créditos y luego usá Reintentar generación.' if ai_control.blocked_error == 'AI_QUOTA' else ai_control.blocked_error }} Las preguntas y tus decisiones se conservan.</p>{% endif %}
 {% for message in get_flashed_messages() %}<p role="status" class="notice">{{ message }}</p>{% endfor %}
 <section><h2>Fuentes y actualización</h2>
 <p>Última consulta/importación exitosa: {{ (sync.success or 'Sin consultas exitosas') if sync else 'Sin consultas exitosas' }} (UTC). Fuente: {{ (sync.source or 'Pendiente') if sync else 'Pendiente' }}</p>
@@ -72,10 +73,10 @@
 <details><summary>Borrador original y atributos de la publicación</summary><p>{{ r.original }}</p><p>{{ r.facts }}</p></details>
 {% if r.approved %}<p><strong>Versión aprobada:</strong> {{ r.approved }}</p>{% endif %}
 <form action="/asistentes/decision/{{ r.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="version" value="{{ r.version }}">
-<p><strong>Respuesta sugerida</strong></p><p class="notice">{{ r.edited or r.original }}</p>
+{% if r.external_status == 'UNANSWERED' %}<p><strong>Respuesta sugerida</strong></p><p class="notice">{{ r.edited or r.original }}</p>{% else %}<p>Consulta ya respondida; la sugerencia anterior queda archivada.</p>{% endif %}
 {% if publications.get(r.id) %}<p role="status">Publicación: {{ publications[r.id].state }} {{ publications[r.id].error or '' }}</p>{% endif %}
 {% if r.external_status == 'UNANSWERED' %}
-<div class="actions"><button formaction="/asistentes/publicar/{{ r.id }}" {% if not publish_enabled or publications.get(r.id) %}disabled{% endif %}>Aprobar y publicar sugerencia</button><button name="action" value="RECHAZADA">Responderé directamente en Mercado Libre</button><button name="action" value="REVISADA">Marcar para revisión</button></div>
+<div class="actions"><button formaction="/asistentes/publicar/{{ r.id }}" {% if not publish_enabled or publications.get(r.id) or (not r.edited and (not drafts.get(r.id) or drafts[r.id].state != 'GENERATED')) %}disabled{% endif %}>Aprobar y publicar sugerencia</button><button name="action" value="RECHAZADA">Responderé directamente en Mercado Libre</button><button name="action" value="REVISADA">Marcar para revisión</button></div>
 {% if not publish_enabled %}<p>Publicación deshabilitada en este entorno.</p>{% endif %}
 {% endif %}</form>
 {% if manual_observations.get(r.id) %}{% set o=manual_observations[r.id] %}<details><summary>Respuesta detectada en Mercado Libre y comparación</summary><p>Origen: {{ o.origin }} · {{ o.observed_at }}</p><p><strong>Respuesta exacta publicada:</strong> {{ o.answer_text }}</p>
