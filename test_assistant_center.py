@@ -51,6 +51,16 @@ class AssistantTests(unittest.TestCase):
             drafts = [r['original'] for r in con.execute('SELECT * FROM questions ORDER BY id')]
         self.assertIn('25',drafts[0]); self.assertIn('100',drafts[1]); self.assertNotIn('100',drafts[0])
 
+    def test_item_network_failure_still_registers_question(self):
+        def get(path):
+            if path=='/users/me':return {'id':123}
+            return {'questions':[{'id':'1234','item_id':'MLA123','text':'Consulta','status':'UNANSWERED','seller_id':123}]}
+        with patch.object(ReadOnlyMercadoLibre,'request',side_effect=get):
+            result,warnings=fetch_questions(lambda:'test',item_loader=lambda *a: (_ for _ in ()).throw(QueryFailure('NETWORK')))
+        self.store.ingest(result,'test')
+        with self.store.connect() as con:self.assertEqual(con.execute('SELECT count(*) FROM questions').fetchone()[0],1)
+        self.assertIn('NETWORK',warnings[0])
+
     def test_no_unverified_claims(self):
         draft, used, missing = suggest('Llega mañana y resiste 50 kilos?',{'logistica':'Full','usos':'resistente'})
         self.assertFalse(used); self.assertTrue(missing); self.assertNotIn('Full',draft)
