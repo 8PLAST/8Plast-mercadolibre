@@ -2,7 +2,7 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>8Plast · Centro de asistentes</title><link rel="stylesheet" href="/static/assistants.css"></head>
 <body><main><a href="/">← Inventario</a><h1>Centro de asistentes</h1>
-<p class="notice">Lectura y sugerencias. Aprobar registra tu decisión; nunca envía respuestas ni cambia Mercado Libre.</p>
+<p class="notice">Sugerencias automáticas en Asistentes. Si te sirve, aprobala para publicar. Si no, respondé directamente en Mercado Libre: recuperaremos tu respuesta para futuras sugerencias.</p>
 <p>IA: {{ 'clave configurada; consultar el estado de cada borrador' if ai_configured else 'pendiente: falta OPENAI_API_KEY en Railway; se usan reglas conservadoras' }}. La información interna de producción no se usa para responder clientes.</p>
 {% for message in get_flashed_messages() %}<p role="status" class="notice">{{ message }}</p>{% endfor %}
 <section><h2>Fuentes y actualización</h2>
@@ -33,9 +33,38 @@
 <p>Recepción confirmada por vos: {{ monitor.test_confirmed or 'PENDIENTE' }}. SENT indica que Telegram aceptó el aviso, no que lo viste. UNKNOWN exige revisar el celular: no se reenvía automáticamente para evitar duplicados.</p>
 {% for a in alerts %}<p>{{ a.created }} · {{ a.kind }} · {{ a.id }} · {{ a.state }} {{ a.error or '' }}</p>{% else %}<p>Sin avisos registrados.</p>{% endfor %}
 </section>
+<details><summary>Configuración técnica: catálogo, cotizador y conocimiento</summary>
+<section id="catalogo"><h2>Catálogo técnico del propietario</h2><p>Versión {{ catalog.version }} · {{ catalog.effective_date }} · {{ catalog.families|length }} familias · Fuente: {{ catalog.source }}</p>
+<p>Este catálogo prevalece sobre atributos de Mercado Libre e historial. Vinculaciones exactas confirmadas: {{ catalog_links|length }}. Una publicación sin vínculo no tiene identidad técnica validada.</p>
+{% for f in catalog.families %}<details><summary>{{ f.name }} · {{ f.variants|length }} variantes</summary><p>{{ f.material }} · {{ f.construction or '' }}</p><table><thead><tr><th>Variante</th><th>Ancho</th><th>Largo</th><th>Micrones reales/cara</th><th>Publicados</th></tr></thead><tbody>{% for v in f.variants %}<tr><td>{{ v.id }}</td><td>{{ v.width_cm }} cm</td><td>{{ v.length_cm if v.length_cm is defined else ('100 m confirmados' if v.length_m_confirmed else 'Según publicación') }}</td><td>{{ v.real_microns_per_face }}</td><td>{{ v.published_microns if v.published_microns is not none else 'No especificado' }}</td></tr>{% endfor %}</tbody></table></details>{% endfor %}
+<details><summary>Confirmar vínculo publicación → variante</summary><form method="post" action="/asistentes/catalogo/vincular"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Publicación MLA<input name="item_id" required></label><label>Variante<select name="variant_id">{% for f in catalog.families %}<optgroup label="{{ f.name }}">{% for v in f.variants %}<option value="{{ v.id }}">{{ v.id }}</option>{% endfor %}</optgroup>{% endfor %}</select></label><label>Detalles confirmados (rollos: material y meters_total)<textarea name="details">{}</textarea></label><label>Fuente de confirmación<input name="source" required></label><button>Guardar vínculo exacto</button></form></details>
+<form method="post" action="/asistentes/catalogo/auditar"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Comparar publicaciones vinculadas con catálogo</button></form>
+{% for d in discrepancies %}<p role="alert">{{ d.item_id }} · {{ d.field }}: publicación {{ d.observed }} / catálogo {{ d.expected }} · {{ d.recorded }}</p>{% else %}<p>No hay discrepancias registradas. Sin vinculaciones no significa que las publicaciones sean correctas.</p>{% endfor %}</section>
+<section id="conocimiento"><h2>Conocimiento confirmado de 8Plast</h2>
+<p>Cargá atributos por publicación exacta o reglas comerciales globales. Cada versión conserva fuente y fecha. El historial es referencia, no confirmación de vigencia.</p>
+<form method="post" action="/asistentes/conocimiento"><input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Alcance (global o MLA exacto)<input name="scope" required maxlength="40"></label>
+<label>Campo (material, alimentos, espesor, mínimo, uso, restricción…)<input name="field" required maxlength="100"></label>
+<label>Valor confirmado<textarea name="value" required maxlength="4000"></textarea></label>
+<label>Fuente / validación del responsable<input name="source" required maxlength="4000"></label>
+<label>ID anterior a reemplazar (opcional)<input name="supersedes" type="number" min="1"></label><button>Guardar conocimiento</button></form>
+{% for k in knowledge %}<p>#{{ k.id }} · {{ k.scope }} · {{ k.field }}: {{ k.value }} · {{ k.source }} · {{ k.updated }} · {{ 'Vigente' if k.active else 'Reemplazada' }}</p>{% else %}<p>Sin datos confirmados cargados. No se importan automáticamente datos internos ni recuerdos del chat.</p>{% endfor %}</section>
+<section><h2>Datos pendientes y posibles contradicciones</h2><p>Auditoría de {{ audit.questions }} preguntas y {{ audit.products }} publicaciones. Temas (se superponen): {{ audit.categories }}.</p>
+{% for g in audit.gaps %}<details><summary>{{ g.item_id }} · {{ g.questions }} preguntas · {{ g.notes|join('; ') }}</summary><p>{{ g.title }} · Atributos: {{ g.attributes }} · Micrajes mencionados: {{ g.thickness }} · Preguntas fuente: {{ g.sources|join(', ') }}</p><p>Las menciones históricas no se incorporan como hechos confirmados. Validar y cargar por ID exacto.</p></details>{% endfor %}</section>
+<section><h2>Calidad y consumo</h2>{% if ai_control.blocked_error %}<p role="alert">IA pausada: {{ ai_control.blocked_error }}. Corregir saldo o autorización y habilitar Reintentar generación.</p>{% endif %}<p>Límite preventivo: 100 intentos/día UTC por defecto, configurable en Railway. Las preguntas pendientes se conservan.</p><p>Meta: 80% aprobadas sin editar; requiere evaluación real.</p>
+<p>Respuestas detectadas fuera del asistente y conservadas como ejemplos: {{ metrics.manual_observations }}. Una misma pregunta puede conservar versiones diferentes sin duplicar el mismo texto.</p>
+<p>Preguntas: {{ metrics.questions }} · Cobertura de IA: {{ metrics.coverage }}% · Intentos: {{ metrics.attempts }} · Errores: {{ metrics.errors or 0 }} · Recuperadas: {{ metrics.recovered }}</p>
+<p>Última decisión por pregunta ({{ metrics.reviewed }} evaluadas): aprobadas sin editar {{ metrics.approved_unchanged }} · editadas {{ metrics.edited }} · rechazadas {{ metrics.rejected }}.
+{% if metrics.reviewed %}Aprobadas sin editar: {{ (100*metrics.approved_unchanged/metrics.reviewed)|round(1) }}% · Editadas: {{ (100*metrics.edited/metrics.reviewed)|round(1) }}% · Rechazadas: {{ (100*metrics.rejected/metrics.reviewed)|round(1) }}%.{% endif %}</p>
+<p>Generación promedio: {{ (metrics.seconds or 0)|round(2) }} s · Costo estimado mes (USD): {{ metrics.month_usd if metrics.month_usd is not none else 'Sin tarifa configurada' }} · Intentos sin precio: {{ metrics.unpriced or 0 }}. Estimaciones parciales según tarifas configuradas; no equivalen a factura.</p></section>
+</details>
 <h2>Bandeja de revisión · {{ rows|length }} preguntas</h2>
 {% for r in rows %}<article id="q-{{ r.id }}"><h3>{{ r.title }} · {{ r.item_id }}</h3><p><strong>Pregunta:</strong> {{ r.question }}</p>
+{% if attempts.get(r.id) %}<p>Última generación: {{ attempts[r.id].duration|round(2) }} s · tokens entrada {{ attempts[r.id].input_tokens }}, salida {{ attempts[r.id].output_tokens }} · costo USD {{ attempts[r.id].cost_usd if attempts[r.id].cost_usd is not none else 'Sin tarifa configurada' }}</p>{% endif %}
 <p>Origen del borrador: {% if drafts.get(r.id) %}{{ drafts[r.id].state }} {{ drafts[r.id].error or '' }}{% else %}reglas conservadoras; IA aún no consultada{% endif %}. Siempre requiere tu revisión.</p>
+{% if drafts.get(r.id) and drafts[r.id].state in ('FALLBACK','BLOCKED') %}<form method="post" action="/asistentes/reintentar/{{ r.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Reintentar generación</button></form>{% endif %}
+{% if drafts.get(r.id) and drafts[r.id].evidence %}<details><summary>Fuentes y ejemplos recuperados</summary><pre>{{ drafts[r.id].evidence }}</pre></details>{% endif %}
+<p><strong>{{ r.display_state }}</strong></p>
 <p>Estado externo: {{ r.external_status }} · Revisión: {{ r.status }} · Actualización: {{ r.updated }}</p>
 {% if r.external_answer %}<p>Respuesta ya publicada: {{ r.external_answer }}</p>{% endif %}
 <p><strong>Datos públicos utilizados:</strong> {% for k,v in r.used.items() %}{{ k }}: {{ v }}; {% else %}No hay atributos suficientes.{% endfor %}</p>
@@ -43,8 +72,14 @@
 <details><summary>Borrador original y atributos de la publicación</summary><p>{{ r.original }}</p><p>{{ r.facts }}</p></details>
 {% if r.approved %}<p><strong>Versión aprobada:</strong> {{ r.approved }}</p>{% endif %}
 <form action="/asistentes/decision/{{ r.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="version" value="{{ r.version }}">
-<label>Respuesta sugerida / tu corrección<textarea name="text" rows="4" maxlength="10000">{{ r.edited or r.original }}</textarea></label>
-<div class="actions"><button name="action" value="EDITADA">Guardar edición</button><button name="action" value="APROBADA">Aprobar versión</button><button name="action" value="RECHAZADA">Rechazar</button><button name="action" value="REVISADA">Marcar revisado</button></div></form>
+<p><strong>Respuesta sugerida</strong></p><p class="notice">{{ r.edited or r.original }}</p>
+{% if publications.get(r.id) %}<p role="status">Publicación: {{ publications[r.id].state }} {{ publications[r.id].error or '' }}</p>{% endif %}
+{% if r.external_status == 'UNANSWERED' %}
+<div class="actions"><button formaction="/asistentes/publicar/{{ r.id }}" {% if not publish_enabled or publications.get(r.id) %}disabled{% endif %}>Aprobar y publicar sugerencia</button><button name="action" value="RECHAZADA">Responderé directamente en Mercado Libre</button><button name="action" value="REVISADA">Marcar para revisión</button></div>
+{% if not publish_enabled %}<p>Publicación deshabilitada en este entorno.</p>{% endif %}
+{% endif %}</form>
+{% if manual_observations.get(r.id) %}{% set o=manual_observations[r.id] %}<details><summary>Respuesta detectada en Mercado Libre y comparación</summary><p>Origen: {{ o.origin }} · {{ o.observed_at }}</p><p><strong>Respuesta exacta publicada:</strong> {{ o.answer_text }}</p>
+{% if o.comparison.has_suggestion %}<p>Sugerencia anterior: {{ o.suggested_text }}</p><p>Agregaste: {{ o.comparison.added|join(' | ') or 'Sin agregados' }}</p><p>Omitiste: {{ o.comparison.omitted|join(' | ') or 'Sin omisiones' }}</p><p>Temas a revisar: {{ o.comparison.review_topics|join(', ') }}</p>{% else %}<p>No había una sugerencia de IA registrada para comparar.</p>{% endif %}<p>{{ o.comparison.warning }}</p></details>{% endif %}
 {% if r.examples %}<details><summary>Ejemplos aprobados para esta publicación</summary>{% for e in r.examples %}<p>{{ e.question }} → {{ e.after_text }}</p>{% endfor %}<p>Usalos como referencia. No se aplican automáticamente a otras preguntas, packs o productos.</p></details>{% endif %}
 </article>{% else %}<p>No hay preguntas cargadas. Consultá la API o importá un archivo.</p>{% endfor %}
 <section><h2>Historial de decisiones y correcciones</h2>{% for h in history %}<details><summary>{{ h.created }} · {{ h.item_id }} · {{ h.action }}</summary><p>Pregunta: {{ h.question }}</p><p>Antes: {{ h.before_text }}</p><p>Después: {{ h.after_text }}</p></details>{% else %}<p>Sin decisiones.</p>{% endfor %}<p>Se muestran las últimas 100 decisiones; el registro completo permanece en la base de revisión.</p></section>

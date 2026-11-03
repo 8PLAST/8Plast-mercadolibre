@@ -92,7 +92,7 @@ class ReadOnlyMercadoLibre:
 
     def request(self, path, method='GET', data=None):
         if method != 'GET' or data is not None or not re.fullmatch(
-                r'/users/me|/questions/search\?seller_id=\d+&api_version=4&limit=50&offset=\d+(?:&sort_fields=date_created&sort_types=DESC)?|/my/received_questions/search\?api_version=4&limit=50&offset=\d+&sort_fields=date_created&sort_types=DESC|/items/MLA\d+', path):
+                r'/questions/\d+|/users/me|/questions/search\?seller_id=\d+&api_version=4&limit=50&offset=\d+(?:&sort_fields=date_created&sort_types=DESC)?|/my/received_questions/search\?api_version=4&limit=50&offset=\d+&sort_fields=date_created&sort_types=DESC|/items/MLA\d+', path):
             raise PermissionError('Esta herramienta solo permite consultas autorizadas.')
         return self._get(path)
 
@@ -164,7 +164,6 @@ def fetch_questions(token_provider, item_loader=None):
             if not isinstance(item, dict): raise QueryFailure('INVALID_RESPONSE', '/items/' + item_id)
             publications[item_id] = item
         except QueryFailure as exc:
-            if exc.code not in ('NOT_FOUND', 'PERMISSION_DENIED', 'POLICY_DENIED'): raise
             publications[item_id] = {}
             warnings.append(f'Publicación {item_id}: {exc.code} HTTP {exc.status}. Pregunta cargada; atributos no accesibles, revisión necesaria.')
     return {'questions': questions, 'publications': publications}, warnings
@@ -197,7 +196,7 @@ def suggest(question, facts):
               'espesor_publicado': 'Espesor publicado', 'color': 'Color', 'peso': 'Peso publicado'}
     answer = 'Hola. ' + ' '.join(f'{labels[k]}: {v}.' for k, v in used.items())
     if missing:
-        answer += ' Necesito confirmar la información de tu consulta antes de darte una respuesta precisa.'
+        answer += ' Falta verificar: ' + ', '.join(labels.get(k, {'usos': 'aptitud para el uso consultado', 'logistica': 'disponibilidad y condiciones de entrega vigentes'}.get(k, k)) for k in missing) + '.'
     return answer.strip(), used, missing
 
 
@@ -242,6 +241,8 @@ class ReviewStore:
         publications = payload.get('publications', {})
         if not isinstance(publications, dict) or len(payload['questions']) > 2000:
             raise ValueError('Formato o tamaño no válido.')
+        from assistant_knowledge import initialize as init_knowledge
+        init_knowledge(self)
         count = 0
         with self.connect() as con:
             for q in payload['questions']:
@@ -255,6 +256,9 @@ class ReviewStore:
                 facts = publication_facts(item)
                 draft, used, missing = suggest(text, facts)
                 answer = (q.get('answer') or {}).get('text', '')
+                if answer:
+                    con.execute('INSERT OR IGNORE INTO assistant_answer_history(question_id,answer,source,recorded) VALUES(?,?,?,?)',
+                                (str(q['id']),str(answer),'Mercado Libre: respuesta publicada',now()))
                 values = (str(q['id']), q['item_id'], str(item.get('title', q['item_id'])), text,
                     str(q.get('status', 'UNKNOWN')), str(answer), json.dumps(facts), draft,
                     json.dumps(missing), json.dumps(used), now())
@@ -262,15 +266,21 @@ class ReviewStore:
                 if existing and (existing['item_id'] != values[1] or existing['question'] != text):
                     raise ValueError('Un ID existente no puede cambiar de pregunta o publicación.')
                 if existing:
+                    from assistant_manual_learning import observe
+                    observe(con,existing,str(answer),str(q.get('status')),published_at=(q.get('answer') or {}).get('date_created'))
+                    con.execute('INSERT OR IGNORE INTO assistant_question_versions(question_id,version,snapshot,recorded) VALUES(?,?,?,?)',
+                                (existing['id'],existing['version'],json.dumps(dict(existing),ensure_ascii=False),now()))
+                    if str(q.get('status'))=='ANSWERED' and answer and con.execute("SELECT 1 FROM sqlite_master WHERE name='assistant_publications_outbox'").fetchone():
+                        con.execute("UPDATE assistant_publications_outbox SET state=CASE WHEN answer=? THEN 'MATCHED_REMOTE' ELSE 'EXTERNAL_ANSWER' END,error=NULL,updated=? WHERE question_id=? AND state IN ('SENDING','UNKNOWN','FAILED')",(str(answer),now(),values[0]))
                     con.execute('UPDATE questions SET external_status=?, external_answer=?, updated=?, external_created=? WHERE id=?',
                         (values[4], values[5], values[-1],str(q.get('date_created','')), values[0]))
                     if facts != json.loads(existing['facts']) or values[2] != existing['title']:
                         con.execute('UPDATE questions SET facts=?,title=? WHERE id=?',(json.dumps(facts),values[2],values[0]))
-                        if existing['status']=='PENDIENTE' and not existing['edited'] and not existing['approved']:
+                        if str(q.get('status'))=='UNANSWERED' and existing['status']=='PENDIENTE' and not existing['edited'] and not existing['approved']:
                             con.execute('UPDATE questions SET original=?,used=?,missing=?,version=version+1 WHERE id=?',
                                 (draft,json.dumps(used),json.dumps(missing),values[0]))
                             if con.execute("SELECT 1 FROM sqlite_master WHERE name='assistant_drafts'").fetchone():
-                                con.execute('DELETE FROM assistant_drafts WHERE question_id=?',(values[0],))
+                                con.execute("UPDATE assistant_drafts SET state='FALLBACK',retry_at=0,lease=NULL WHERE question_id=?",(values[0],))
                         elif facts != json.loads(existing['facts']):
                             missing = json.loads(existing['missing'])
                             note = 'Datos de la publicación cambiaron; revisar tu versión guardada'
@@ -278,6 +288,9 @@ class ReviewStore:
                             con.execute('UPDATE questions SET missing=? WHERE id=?',(json.dumps(missing),values[0]))
                 else:
                     con.execute('INSERT INTO questions(id,item_id,title,question,external_status,external_answer,facts,original,missing,used,updated) VALUES (?,?,?,?,?,?,?,?,?,?,?)', values)
+                    from assistant_manual_learning import observe
+                    inserted=con.execute('SELECT * FROM questions WHERE id=?',(values[0],)).fetchone()
+                    observe(con,inserted,str(answer),str(q.get('status')),published_at=(q.get('answer') or {}).get('date_created'))
                     count += 1
                     con.execute('UPDATE questions SET external_created=? WHERE id=?',(str(q.get('date_created','')),values[0]))
             con.execute('INSERT INTO sync(id,success,error,source) VALUES(1,?,NULL,?) ON CONFLICT(id) DO UPDATE SET success=excluded.success,error=NULL,source=excluded.source', (now(), source))
@@ -304,7 +317,7 @@ class ReviewStore:
 def publication_facts(item):
     # Only explicit public attributes; no production thickness, stock or delivery promises.
     allowed = {'UNITS_PER_PACK': 'unidades_pack', 'COLOR': 'color', 'THICKNESS': 'espesor_publicado',
-               'SALE_FORMAT': 'presentacion', 'WEIGHT': 'peso'}
+               'SALE_FORMAT': 'presentacion', 'WEIGHT': 'peso', 'MATERIAL': 'material_publicado'}
     facts = {}
     attrs = {a.get('id'): a.get('value_name') for a in item.get('attributes', []) if isinstance(a, dict)}
     for attr, key in allowed.items():
@@ -335,12 +348,89 @@ def register_center(app, review_path, token_provider=None):
         for r in rows:
             for field in ('facts', 'missing', 'used'): r[field] = json.loads(r[field])
             # Corrections are examples scoped to this exact publication, never global rules.
+            r['display_state']=('Respondida manualmente en Mercado Libre' if r['status']=='RESPONDIDA_MANUALMENTE' else
+                'Respondida; origen por verificar' if r['status']=='RESPONDIDA_ORIGEN_INCIERTO' else
+                'Respuesta aprobada' if r['status']=='APROBADA' else
+                'Esperando respuesta manual en Mercado Libre' if r['status']=='RECHAZADA' and r['external_status']=='UNANSWERED' else
+                'Necesita revisión' if r['missing'] else 'Sugerencia pendiente')
             r['examples'] = [h for h in history if h['item_id'] == r['item_id'] and h['action'] == 'APROBADA'][:3]
+        from assistant_knowledge import metrics, audit
+        from technical_catalog import load as load_catalog, initialize as init_catalog
+        init_catalog(store)
+        catalog=load_catalog()
+        from assistant_publishing import initialize as init_publishing
+        init_publishing(store)
+        with store.connect() as con:
+            catalog_links={r['item_id']:dict(r) for r in con.execute('SELECT * FROM catalog_publication_links WHERE id IN (SELECT max(id) FROM catalog_publication_links GROUP BY item_id)')}
+            discrepancies=[dict(r) for r in con.execute('SELECT * FROM catalog_discrepancies ORDER BY id DESC')]
+            manual_observations={r['question_id']:dict(r) for r in con.execute('SELECT * FROM assistant_response_observations WHERE id IN (SELECT max(id) FROM assistant_response_observations GROUP BY question_id)')}
+            ai_control=dict(con.execute('SELECT * FROM assistant_ai_control WHERE id=1').fetchone())
+            attempts={r['question_id']:dict(r) for r in con.execute('SELECT * FROM assistant_attempts WHERE id IN (SELECT max(id) FROM assistant_attempts GROUP BY question_id)')}
+            publications={r['question_id']:dict(r) for r in con.execute('SELECT * FROM assistant_publications_outbox')}
+            knowledge=[dict(r) for r in con.execute('SELECT * FROM assistant_knowledge ORDER BY id DESC')]
+        for observation in manual_observations.values():observation['comparison']=json.loads(observation['comparison'])
         return render_template('assistants.html', rows=rows, history=history, sync=sync,
+            knowledge=knowledge, metrics=metrics(store), audit=audit(store), publications=publications, attempts=attempts, ai_control=ai_control,
+            manual_observations=manual_observations, catalog=catalog, catalog_links=catalog_links, discrepancies=discrepancies,
+            publish_enabled=os.getenv('ASSISTANT_PUBLISH_ENABLED')=='1' and token_provider is not None,
             monitor=monitor, alerts=alerts, drafts=drafts, interval=INTERVAL,
             telegram_configured=bool(os.getenv('TELEGRAM_BOT_TOKEN')),ai_configured=bool(os.getenv('OPENAI_API_KEY')),
             connection_ready=token_provider is not None,
             connection_message=None if token_provider else FAILURES['CONFIGURATION_MISSING'])
+
+    @bp.post('/asistentes/catalogo/vincular')
+    def catalog_link():
+        from technical_catalog import link
+        try:
+            details=json.loads(request.form.get('details','{}'))
+            link(store,request.form.get('item_id',''),request.form.get('variant_id',''),details,request.form.get('source',''))
+            flash('Vinculación al catálogo guardada como nueva versión. No modifica Mercado Libre.')
+        except (ValueError,TypeError,KeyError) as exc:flash('Revisar vínculo: '+str(exc))
+        return redirect('/asistentes#catalogo')
+
+    @bp.post('/asistentes/catalogo/auditar')
+    def catalog_audit():
+        from technical_catalog import evidence
+        with store.connect() as con:
+            questions=[dict(r) for r in con.execute('SELECT * FROM questions')]
+        for q in questions:evidence(store,q['item_id'],json.loads(q['facts']))
+        flash('Auditoría ejecutada contra las publicaciones vinculadas. Las demás requieren confirmar su identidad.')
+        return redirect('/asistentes#catalogo')
+
+    @bp.post('/asistentes/publicar/<qid>')
+    def publish_answer(qid):
+        from assistant_publishing import publish
+        try:
+            with store.connect() as con:
+                q=con.execute('SELECT * FROM questions WHERE id=?',(qid,)).fetchone()
+            if not q:abort(404)
+            state=publish(store,qid,q['edited'] or q['original'],int(request.form['version']),token_provider)
+            flash('Resultado de publicación: '+state+'. No se realizan reenvíos automáticos.')
+        except (ValueError,KeyError) as exc: flash(str(exc))
+        except QueryFailure as exc: flash(exc.public_message())
+        return redirect('/asistentes#q-'+qid)
+
+    @bp.post('/asistentes/conocimiento')
+    def knowledge_save():
+        from assistant_knowledge import save, initialize
+        initialize(store)
+        try:
+            save(store,request.form.get('scope',''),request.form.get('field',''),
+                 request.form.get('value',''),request.form.get('source',''),
+                 int(request.form['supersedes']) if request.form.get('supersedes') else None)
+            flash('Conocimiento guardado con fuente y fecha; las versiones anteriores se conservan.')
+        except ValueError as exc: flash(str(exc))
+        return redirect('/asistentes#conocimiento')
+
+    @bp.post('/asistentes/reintentar/<qid>')
+    def retry_draft(qid):
+        from assistant_automation import initialize
+        initialize(store)
+        with store.connect() as con:
+            con.execute('UPDATE assistant_ai_control SET blocked_error=NULL WHERE id=1')
+            con.execute("UPDATE assistant_drafts SET state='FALLBACK',retry_at=0 WHERE question_id=? AND state IN ('BLOCKED','FALLBACK')",(qid,))
+        flash('Reintento habilitado para el próximo ciclo; revisá saldo y configuración si el error es permanente.')
+        return redirect('/asistentes#q-'+qid)
 
     @bp.post('/asistentes/automatizacion')
     def automation():
@@ -387,7 +477,10 @@ def register_center(app, review_path, token_provider=None):
     @bp.post('/asistentes/decision/<qid>')
     def decision(qid):
         try:
-            store.decide(qid, request.form['action'], request.form.get('text',''), int(request.form['version']))
+            if request.form['action'] not in ('RECHAZADA','REVISADA'):
+                raise ValueError('Las respuestas no se editan aquí. Aprobá la sugerencia o respondé directamente en Mercado Libre.')
+            store.decide(qid, request.form['action'], '', int(request.form['version']))
+
             flash('Decisión guardada. No se envió ninguna respuesta ni se ejecutaron cambios externos.')
         except (ValueError, KeyError) as exc: flash(str(exc))
         return redirect('/asistentes')

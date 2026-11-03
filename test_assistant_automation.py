@@ -43,6 +43,24 @@ class AutomationTests(unittest.TestCase):
         text = send.call_args[0][1]['text']
         self.assertIn('50',text); self.assertIn(auto.PANEL+'#q-2',text)
 
+    def test_old_answer_failure_does_not_hide_new_alert(self):
+        with self.store.connect() as con:
+            con.execute("UPDATE assistant_monitor SET baseline='2026-10-07T09:00:00+00:00' WHERE id=1")
+        with patch.object(auto,'fetch_questions',return_value=(self.payload(),[])), patch.object(auto,'sync_known_answers',side_effect=QueryFailure('NETWORK')):
+            auto.poll(self.store,lambda:'token')
+        self.assertEqual(len(self.read('questions')),1)
+        self.assertEqual(self.read('assistant_alerts')[0]['question_id'],'1')
+        self.assertIsNotNone(self.read('assistant_monitor')[0]['last_success'])
+        self.assertIn('Historial pendiente',self.read('sync')[0]['warning'])
+
+    def test_failed_draft_does_not_prevent_other_drafts_or_dispatch(self):
+        self.store.ingest(self.payload(),'test')
+        self.store.ingest(self.payload('2'),'test')
+        with patch.dict(os.environ,{'OPENAI_API_KEY':'test'}), patch.object(auto,'check_pairing'), patch.object(auto,'draft_question',side_effect=[RuntimeError('broken'),None]) as draft, patch.object(auto,'dispatch') as dispatch:
+            auto.tick(self.store,None,query=False)
+        self.assertEqual(draft.call_count,2)
+        dispatch.assert_called_once_with(self.store)
+
     def test_failure_not_empty_success_or_baseline(self):
         with patch.object(auto,'fetch_questions',side_effect=QueryFailure('POLICY_DENIED','/my/received_questions/search',403)):
             auto.tick(self.store,lambda:'token')
@@ -82,7 +100,7 @@ class AutomationTests(unittest.TestCase):
 
     def test_ai_cannot_invent_facts_and_does_not_overwrite_human_changes(self):
         self.store.ingest(self.payload(),'test')
-        result = {'status':'completed','output':[{'type':'message','content':[{'type':'output_text','text':json.dumps({'facts':['unidades_pack'],'needs_review':False})}]}]}
+        result = {'status':'completed','output':[{'type':'message','content':[{'type':'output_text','text':json.dumps({'answer':'Hola. Unidades por pack: 50.','evidence_ids':['attribute:unidades_pack'],'warnings':[]})}]}]}
         with patch.dict(os.environ,{'OPENAI_API_KEY':'secret-test'}),patch.object(auto,'post_json',return_value=result) as api:
             auto.draft_question(self.store,'1')
         q = self.read('questions')[0]
@@ -92,7 +110,7 @@ class AutomationTests(unittest.TestCase):
         with patch.object(auto,'ai_draft',side_effect=AssertionError('no llamada')):
             auto.draft_question(self.store,'1')
         self.assertEqual(self.read('questions')[0]['edited'],'Mi corrección')
-        result['output'][0]['content'][0]['text']=json.dumps({'facts':['medida'],'needs_review':False})
+        result['output'][0]['content'][0]['text']=json.dumps({'answer':'Hola','evidence_ids':['attribute:medida'],'warnings':[]})
         with patch.dict(os.environ,{'OPENAI_API_KEY':'secret-test'}),patch.object(auto,'post_json',return_value=result):
             with self.assertRaises(auto.ServiceFailure): auto.ai_draft('medidas',{'unidades_pack':'50'})
 

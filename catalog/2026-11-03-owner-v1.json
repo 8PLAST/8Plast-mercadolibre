@@ -1,0 +1,718 @@
+{
+  "version": "2026-11-03-owner-v1",
+  "effective_date": "2026-11-03",
+  "source": "Catálogo técnico definitivo validado por Lucas, adjunto Texto pegado(2).txt",
+  "thickness_basis": "real_per_face",
+  "priority": [
+    "owner_catalog",
+    "exact_publication_identity",
+    "current_operations",
+    "reviewed_history",
+    "commercial_style"
+  ],
+  "rules": [
+    "No reemplazar catálogo con atributos de ML ni respuestas antiguas",
+    "No garantizar cargas no ensayadas",
+    "No inventar certificaciones",
+    "No inferir stock/precios/envíos de catálogo",
+    "Rojas/amarillas 100 se calculan en 100 reales, nunca 80",
+    "Leña: ancho ya incluye fuelle",
+    "Todas las bolsas cristal son vírgenes",
+    "Rollos: validar variante completa, material y metros; 50 cm solo 70 mic y 100 m confirmados"
+  ],
+  "families": [
+    {
+      "id": "consorcio_black",
+      "name": "Bolsas negras de consorcio",
+      "kind": "bags",
+      "material": "black_recovered",
+      "uses": [
+        "Residuos comunes",
+        "Consorcios",
+        "Uso cotidiano"
+      ],
+      "variants": [
+        {
+          "id": "consorcio_black-45x60-35",
+          "width_cm": 45,
+          "length_cm": 60,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_black-50x70-35",
+          "width_cm": 50,
+          "length_cm": 70,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_black-60x90-35",
+          "width_cm": 60,
+          "length_cm": 90,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_black-70x100-35",
+          "width_cm": 70,
+          "length_cm": 100,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_black-80x110-35",
+          "width_cm": 80,
+          "length_cm": 110,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_black-90x120-40",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 40,
+          "published_microns": null
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "negro",
+      "virgin": false
+    },
+    {
+      "id": "consorcio_green",
+      "name": "Bolsas verdes de consorcio",
+      "kind": "bags",
+      "material": "green",
+      "uses": [
+        "Residuos comunes",
+        "Consorcios",
+        "Jardinería"
+      ],
+      "variants": [
+        {
+          "id": "consorcio_green-40x50-35",
+          "width_cm": 40,
+          "length_cm": 50,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_green-45x60-35",
+          "width_cm": 45,
+          "length_cm": 60,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_green-50x70-35",
+          "width_cm": 50,
+          "length_cm": 70,
+          "real_microns_per_face": 35,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_green-70x100-40",
+          "width_cm": 70,
+          "length_cm": 100,
+          "real_microns_per_face": 40,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_green-80x110-40",
+          "width_cm": 80,
+          "length_cm": 110,
+          "real_microns_per_face": 40,
+          "published_microns": null
+        },
+        {
+          "id": "consorcio_green-90x120-40",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 40,
+          "published_microns": null
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "verde",
+      "virgin": false
+    },
+    {
+      "id": "red_pathological",
+      "name": "Bolsas rojas patológicas",
+      "kind": "bags",
+      "material": "red_yellow",
+      "uses": [
+        "Residuos patológicos",
+        "Separación identificada"
+      ],
+      "variants": [
+        {
+          "id": "red_pathological-50x70-40-p40",
+          "width_cm": 50,
+          "length_cm": 70,
+          "real_microns_per_face": 40,
+          "published_microns": 40
+        },
+        {
+          "id": "red_pathological-60x90-40-p40",
+          "width_cm": 60,
+          "length_cm": 90,
+          "real_microns_per_face": 40,
+          "published_microns": 40
+        },
+        {
+          "id": "red_pathological-60x90-100-p100",
+          "width_cm": 60,
+          "length_cm": 90,
+          "real_microns_per_face": 100,
+          "published_microns": 100
+        },
+        {
+          "id": "red_pathological-80x110-40-p40",
+          "width_cm": 80,
+          "length_cm": 110,
+          "real_microns_per_face": 40,
+          "published_microns": 40
+        },
+        {
+          "id": "red_pathological-90x120-40-p40",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 40,
+          "published_microns": 40
+        },
+        {
+          "id": "red_pathological-90x120-100-p100",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 100,
+          "published_microns": 100
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "rojo",
+      "certifications_confirmed": [],
+      "virgin": false
+    },
+    {
+      "id": "yellow",
+      "name": "Bolsas amarillas",
+      "kind": "bags",
+      "material": "red_yellow",
+      "uses": [
+        "Residuos patológicos",
+        "Separación identificada"
+      ],
+      "variants": [
+        {
+          "id": "yellow-60x90-40-p40",
+          "width_cm": 60,
+          "length_cm": 90,
+          "real_microns_per_face": 40,
+          "published_microns": 40
+        },
+        {
+          "id": "yellow-60x90-100-p100",
+          "width_cm": 60,
+          "length_cm": 90,
+          "real_microns_per_face": 100,
+          "published_microns": 100
+        },
+        {
+          "id": "yellow-90x120-40-p45",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 40,
+          "published_microns": 45
+        },
+        {
+          "id": "yellow-90x120-100-p100",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 100,
+          "published_microns": 100
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "amarillo",
+      "certifications_confirmed": [],
+      "virgin": false
+    },
+    {
+      "id": "blue",
+      "name": "Bolsas azules",
+      "kind": "bags",
+      "material": "blue",
+      "uses": [
+        "Residuos",
+        "Separación identificada por color"
+      ],
+      "variants": [
+        {
+          "id": "blue-60x90-35-p35",
+          "width_cm": 60,
+          "length_cm": 90,
+          "real_microns_per_face": 35,
+          "published_microns": 35
+        },
+        {
+          "id": "blue-80x110-40-p40",
+          "width_cm": 80,
+          "length_cm": 110,
+          "real_microns_per_face": 40,
+          "published_microns": 40
+        },
+        {
+          "id": "blue-90x120-100-p100",
+          "width_cm": 90,
+          "length_cm": 120,
+          "real_microns_per_face": 100,
+          "published_microns": 100
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "azul",
+      "virgin": false
+    },
+    {
+      "id": "crystal",
+      "name": "Bolsas cristal transparentes",
+      "kind": "bags",
+      "material": "virgin_ldpe",
+      "uses": [
+        "Embolsado",
+        "Alimentos según especificación comercial",
+        "Freezer"
+      ],
+      "variants": [
+        {
+          "id": "crystal-15x20-70",
+          "width_cm": 15,
+          "length_cm": 20,
+          "real_microns_per_face": 70,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-15x25-70",
+          "width_cm": 15,
+          "length_cm": 25,
+          "real_microns_per_face": 70,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-15x30-70",
+          "width_cm": 15,
+          "length_cm": 30,
+          "real_microns_per_face": 70,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-20x30-50",
+          "width_cm": 20,
+          "length_cm": 30,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-20x40-50",
+          "width_cm": 20,
+          "length_cm": 40,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-25x35-50",
+          "width_cm": 25,
+          "length_cm": 35,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-30x40-50",
+          "width_cm": 30,
+          "length_cm": 40,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-30x45-50",
+          "width_cm": 30,
+          "length_cm": 45,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-35x40-50",
+          "width_cm": 35,
+          "length_cm": 40,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-35x45-50",
+          "width_cm": 35,
+          "length_cm": 45,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-35x50-50",
+          "width_cm": 35,
+          "length_cm": 50,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-40x50-60",
+          "width_cm": 40,
+          "length_cm": 50,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-40x60-60",
+          "width_cm": 40,
+          "length_cm": 60,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-50x70-30",
+          "width_cm": 50,
+          "length_cm": 70,
+          "real_microns_per_face": 30,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-50x80-30",
+          "width_cm": 50,
+          "length_cm": 80,
+          "real_microns_per_face": 30,
+          "published_microns": null
+        },
+        {
+          "id": "crystal-120x150-50",
+          "width_cm": 120,
+          "length_cm": 150,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "transparente",
+      "virgin": true,
+      "food_contact_commercial": true,
+      "freezer_commercial": true,
+      "food_certification": false,
+      "construction": "Sellada solo en fondo, abierta arriba, laterales continuos sin termosellado lateral"
+    },
+    {
+      "id": "firewood",
+      "name": "Bolsas para leña y carbón",
+      "kind": "bags",
+      "material": "firewood",
+      "uses": [
+        "Leña",
+        "Carbón"
+      ],
+      "variants": [
+        {
+          "id": "firewood-30x63-60",
+          "width_cm": 30,
+          "length_cm": 63,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        },
+        {
+          "id": "firewood-35x70-60",
+          "width_cm": 35,
+          "length_cm": 70,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        },
+        {
+          "id": "firewood-40x70-60",
+          "width_cm": 40,
+          "length_cm": 70,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        },
+        {
+          "id": "firewood-40x80-60",
+          "width_cm": 40,
+          "length_cm": 80,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        },
+        {
+          "id": "firewood-50x80-60",
+          "width_cm": 50,
+          "length_cm": 80,
+          "real_microns_per_face": 60,
+          "published_microns": null
+        }
+      ],
+      "load_guarantee_kg": null,
+      "gusset": true,
+      "width_includes_gusset": true,
+      "load_reference": {
+        "variant": "firewood-50x80-60",
+        "range_kg": [
+          12,
+          15
+        ],
+        "source": "Usos informados por clientes según propietario",
+        "tested": false,
+        "guaranteed": false,
+        "depends_on": "Características de la leña"
+      },
+      "commercial": "Resistencia, calidad y practicidad",
+      "virgin": false
+    },
+    {
+      "id": "rubble",
+      "name": "Bolsas para escombros",
+      "kind": "bags",
+      "material": "black_recovered",
+      "uses": [
+        "Escombros",
+        "Residuos de obra"
+      ],
+      "variants": [
+        {
+          "id": "rubble-40x60-100",
+          "width_cm": 40,
+          "length_cm": 60,
+          "real_microns_per_face": 100,
+          "published_microns": null
+        },
+        {
+          "id": "rubble-50x70-100",
+          "width_cm": 50,
+          "length_cm": 70,
+          "real_microns_per_face": 100,
+          "published_microns": null
+        }
+      ],
+      "load_guarantee_kg": null,
+      "color": "negro",
+      "virgin": false
+    },
+    {
+      "id": "rolls",
+      "name": "Rollos tubo de polietileno",
+      "kind": "rolls",
+      "material": "publication_specific",
+      "variants": [
+        {
+          "id": "rolls-10-50",
+          "width_cm": 10,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-10-100",
+          "width_cm": 10,
+          "real_microns_per_face": 100,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-15-70",
+          "width_cm": 15,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-20-50",
+          "width_cm": 20,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-20-70",
+          "width_cm": 20,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-25-50",
+          "width_cm": 25,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-30-50",
+          "width_cm": 30,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-30-70",
+          "width_cm": 30,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-35-50",
+          "width_cm": 35,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-35-70",
+          "width_cm": 35,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-40-50",
+          "width_cm": 40,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-40-70",
+          "width_cm": 40,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-50-70",
+          "width_cm": 50,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": 100,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-60-50",
+          "width_cm": 60,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-60-70",
+          "width_cm": 60,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-80-50",
+          "width_cm": 80,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-100-50",
+          "width_cm": 100,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-120-50",
+          "width_cm": 120,
+          "real_microns_per_face": 50,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        },
+        {
+          "id": "rolls-120-70",
+          "width_cm": 120,
+          "real_microns_per_face": 70,
+          "published_microns": null,
+          "length_m_confirmed": null,
+          "material_requires_publication": true,
+          "availability_requires_publication": true
+        }
+      ],
+      "presentation": "tube",
+      "construction": "Tubo o manga, laterales continuos y ambos extremos abiertos",
+      "lengths_general_m": [
+        100,
+        200,
+        400,
+        500,
+        600,
+        800,
+        1000
+      ],
+      "cartesian_combinations_confirmed": false,
+      "load_guarantee_kg": null
+    },
+    {
+      "id": "ice",
+      "name": "Bolsas para hielo",
+      "kind": "bags",
+      "material": "virgin_ldpe",
+      "uses": [
+        "Embolsado de hielo"
+      ],
+      "variants": [
+        {
+          "id": "ice-25x40-50",
+          "width_cm": 25,
+          "length_cm": 40,
+          "real_microns_per_face": 50,
+          "published_microns": null
+        }
+      ],
+      "load_guarantee_kg": null,
+      "virgin": true,
+      "commercial_ice_capacity_kg": 2,
+      "construction": "Sellada en fondo y abierta arriba para cierre con nudo",
+      "only_confirmed_size": true
+    }
+  ]
+}
