@@ -4,7 +4,7 @@ import unicodedata
 
 
 def reasoning_context(question, alternatives, technical):
-    text = unicodedata.normalize('NFKD', question.lower()).encode('ascii', 'ignore').decode()
+    text = unicodedata.normalize('NFKD', question.lower().replace('×','x')).encode('ascii', 'ignore').decode()
     if not re.search(r'\b(tacho|cesto|contenedor)\b', text):
         return []
     # Only derive from an explicit rectangular mouth and an explicit height.

@@ -225,6 +225,10 @@ class ReviewStore:
             if 'external_created' not in {r[1] for r in con.execute('PRAGMA table_info(questions)')}:
                 con.execute('ALTER TABLE questions ADD COLUMN external_created TEXT')
 
+            for name in ('buyer_id', 'external_answer_created'):
+                if name not in {r[1] for r in con.execute('PRAGMA table_info(questions)')}:
+                    con.execute(f'ALTER TABLE questions ADD COLUMN {name} TEXT')
+
     @contextmanager
     def connect(self):
         con = sqlite3.connect(self.path, timeout=15)
@@ -263,6 +267,10 @@ class ReviewStore:
                     str(q.get('status', 'UNKNOWN')), str(answer), json.dumps(facts), draft,
                     json.dumps(missing), json.dumps(used), now())
                 existing = con.execute('SELECT * FROM questions WHERE id=?', (values[0],)).fetchone()
+                buyer = (q.get('from') or {}).get('id') if isinstance(q.get('from'), dict) else None
+                buyer = str(buyer) if buyer is not None and str(buyer).isdigit() else None
+                if existing and existing['buyer_id'] and buyer and existing['buyer_id'] != buyer:
+                    raise ValueError('Un ID existente no puede cambiar de comprador.')
                 if existing and (existing['item_id'] != values[1] or existing['question'] != text):
                     raise ValueError('Un ID existente no puede cambiar de pregunta o publicación.')
                 if existing:
@@ -292,7 +300,8 @@ class ReviewStore:
                     inserted=con.execute('SELECT * FROM questions WHERE id=?',(values[0],)).fetchone()
                     observe(con,inserted,str(answer),str(q.get('status')),published_at=(q.get('answer') or {}).get('date_created'))
                     count += 1
-                    con.execute('UPDATE questions SET external_created=? WHERE id=?',(str(q.get('date_created','')),values[0]))
+                con.execute("UPDATE questions SET buyer_id=COALESCE(buyer_id,?), external_created=CASE WHEN ?<>'' THEN ? ELSE external_created END, external_answer_created=COALESCE(NULLIF(?,''),external_answer_created) WHERE id=?",
+                            (buyer,str(q.get('date_created') or ''),str(q.get('date_created') or ''),str((q.get('answer') or {}).get('date_created') or ''),values[0]))
             con.execute('INSERT INTO sync(id,success,error,source) VALUES(1,?,NULL,?) ON CONFLICT(id) DO UPDATE SET success=excluded.success,error=NULL,source=excluded.source', (now(), source))
         return count
 
@@ -369,7 +378,8 @@ def register_center(app, review_path, token_provider=None):
             publications={r['question_id']:dict(r) for r in con.execute('SELECT * FROM assistant_publications_outbox')}
             knowledge=[dict(r) for r in con.execute('SELECT * FROM assistant_knowledge ORDER BY id DESC')]
         for observation in manual_observations.values():observation['comparison']=json.loads(observation['comparison'])
-        return render_template('assistants.html', rows=rows, history=history, sync=sync,
+        from assistant_diagnostics import status as diagnostics_status
+        return render_template('assistants.html', diagnostics=diagnostics_status(store), rows=rows, history=history, sync=sync,
             knowledge=knowledge, metrics=metrics(store), audit=audit(store), publications=publications, attempts=attempts, ai_control=ai_control,
             manual_observations=manual_observations, catalog=catalog, catalog_links=catalog_links, discrepancies=discrepancies,
             publish_enabled=os.getenv('ASSISTANT_PUBLISH_ENABLED')=='1' and token_provider is not None,
@@ -421,6 +431,18 @@ def register_center(app, review_path, token_provider=None):
             flash('Conocimiento guardado con fuente y fecha; las versiones anteriores se conservan.')
         except ValueError as exc: flash(str(exc))
         return redirect('/asistentes#conocimiento')
+
+    @bp.get('/asistentes/diagnostico')
+    def diagnostics():
+        from assistant_diagnostics import status
+        return status(store)
+
+    @bp.post('/asistentes/verificar-ia')
+    def verify_ai():
+        from assistant_diagnostics import probe
+        result=probe(store)
+        flash('Conexión IA: '+result['state']+(' · '+result['error'] if result['error'] else '')+'. La prueba no publica respuestas ni envía avisos.')
+        return redirect('/asistentes')
 
     @bp.post('/asistentes/reintentar/<qid>')
     def retry_draft(qid):

@@ -120,7 +120,9 @@ def retrieve(store, qid, item_id, question, limit=8):
         size=len(json.dumps(e,ensure_ascii=False))
         if size<=budget:bounded.append(e);budget-=size
     examples=bounded
-    return {'publication':{'item_id':item_id,'title':current['title'] if current else ''},
+    from assistant_conversation import conversation
+    thread=conversation(store,qid)
+    return {'conversation':thread,'publication':{'item_id':item_id,'title':current['title'] if current else ''},
             'knowledge':evidence,'catalog_alternatives':alternatives,'reasoning':reasoning,'examples':examples,'history_scanned':len(rows),'catalog':technical,
             'warnings':technical['warnings']+['Las respuestas históricas no confirman stock, precios ni condiciones vigentes.',
                         'Ante contradicciones técnicas, pedir validación; nunca elegir un valor por mayoría.']}

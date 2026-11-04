@@ -170,6 +170,7 @@ def ai_draft(question, facts, context=None):
           'Consultá medidas, espesores reales por cara, materiales, confección y restricciones solo en el catálogo recibido. '
           'Ante discrepancia del catálogo con una publicación, advertí al responsable sin reemplazar el dato del catálogo. '
           'Sin identity_confirmed no atribuyas una ficha a un MLA por similitud o historial. '
+          'conversation contiene turnos anteriores del mismo comprador y publicación. Usalos para interpretar repreguntas y objeciones, sin tratar una afirmación previa como hecho técnico confirmado. Si no hay turnos verificables, no inventes una conversación. '
           'Antes de pedir datos, resolvé la consulta: interpretá la necesidad, consultá knowledge y catalog_alternatives, '
           'y usá razonamiento y cálculos a partir de los datos explícitos del comprador. No necesitás un antecedente idéntico. '
           'El catálogo de alternativas permite recomendar otros productos confirmados aun sin vínculo de la publicación actual; '
@@ -202,7 +203,7 @@ def ai_draft(question, facts, context=None):
                for p in output.get('content',[]) if p.get('type')=='output_text']
         result=json.loads(''.join(parts))
         answer=result['answer'].strip(); ids=result['evidence_ids']; warnings=result['warnings']
-        allowed={('attribute:'+k) for k in facts} | {e['id'] for e in context['knowledge']+context['examples']+context.get('catalog_alternatives',[])+context.get('reasoning',[])}
+        allowed={('attribute:'+k) for k in facts} | {e['id'] for e in context['knowledge']+context['examples']+context.get('catalog_alternatives',[])+context.get('reasoning',[])+context.get('conversation',[])}
         if not answer or len(answer)>2000 or not isinstance(ids,list) or any(x not in allowed for x in ids): raise ValueError()
         if not isinstance(warnings,list) or any(not isinstance(x,str) for x in warnings): raise ValueError()
         used={k:v for k,v in facts.items() if 'attribute:'+k in ids}
