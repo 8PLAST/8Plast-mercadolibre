@@ -170,7 +170,22 @@ def ai_draft(question, facts, context=None):
           'Consultá medidas, espesores reales por cara, materiales, confección y restricciones solo en el catálogo recibido. '
           'Ante discrepancia del catálogo con una publicación, advertí al responsable sin reemplazar el dato del catálogo. '
           'Sin identity_confirmed no atribuyas una ficha a un MLA por similitud o historial. '
-          'Si falta información, proponé una pregunta concreta al comprador y explicá al vendedor qué falta en warnings. '
+          'Antes de pedir datos, resolvé la consulta: interpretá la necesidad, consultá knowledge y catalog_alternatives, '
+          'y usá razonamiento y cálculos a partir de los datos explícitos del comprador. No necesitás un antecedente idéntico. '
+          'El catálogo de alternativas permite recomendar otros productos confirmados aun sin vínculo de la publicación actual; '
+          'no prueba stock, precio, enlace, ni que una alternativa sea el producto de este MLA. '
+          'Usá reasoning cuando esté presente: es un cálculo geométrico verificable, no una prueba física. '
+          'Para tacho rectangular, ancho plano mínimo = largo de boca + ancho de boca; para circular = pi por diámetro / 2. '
+          'Comprobá también el largo: altura más aproximadamente media dimensión menor del fondo y margen de doblado/cierre. '
+          'Indicá cuándo una medida entra teóricamente pero queda ajustada; elegí del catálogo una alternativa con holgura '
+          'y reconocé si sobra largo. Nunca compares ancho plano con una sola dimensión de la boca. '
+          'Podés aplicar conocimientos generales y aritmética sin inventar atributos específicos, ensayos ni certificaciones. '
+          'Si un dato puede calcularse, calculalo; no le pidas al vendedor que confirme una operación matemática. '
+          'No confundas una recomendación geométrica con garantía de carga. '
+          'No agregues advertencias de stock, precio o vigencia histórica si no afectan la respuesta solicitada. '
+          'Si realmente falta información indispensable, preguntá solo ese dato concreto al comprador; '
+          'si es un dato interno de la empresa, dejalo al vendedor en warnings, no se lo preguntes al comprador. '
+          'No afirmes haber buscado en internet o consultado registros externos: solo contás con las fuentes recibidas. '
           'answer es solo el texto para el comprador, warnings es interno. evidence_ids enumera los IDs usados '
           '(attribute:campo, kb:n o history:n). Si se solicita custom_request, devolvé null cuando no es '
           'fabricación personalizada. Si lo es extraé únicamente datos explícitos confirmados, usando null para faltantes. '
@@ -187,7 +202,7 @@ def ai_draft(question, facts, context=None):
                for p in output.get('content',[]) if p.get('type')=='output_text']
         result=json.loads(''.join(parts))
         answer=result['answer'].strip(); ids=result['evidence_ids']; warnings=result['warnings']
-        allowed={('attribute:'+k) for k in facts} | {e['id'] for e in context['knowledge']+context['examples']}
+        allowed={('attribute:'+k) for k in facts} | {e['id'] for e in context['knowledge']+context['examples']+context.get('catalog_alternatives',[])+context.get('reasoning',[])}
         if not answer or len(answer)>2000 or not isinstance(ids,list) or any(x not in allowed for x in ids): raise ValueError()
         if not isinstance(warnings,list) or any(not isinstance(x,str) for x in warnings): raise ValueError()
         used={k:v for k,v in facts.items() if 'attribute:'+k in ids}

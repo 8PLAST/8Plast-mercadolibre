@@ -70,7 +70,7 @@ def retrieve(store, qid, item_id, question, limit=8):
           LEFT JOIN assistant_answer_history h ON h.id=(SELECT max(id) FROM assistant_answer_history WHERE question_id=q.id)
           LEFT JOIN assistant_response_observations o ON o.id=(SELECT max(id) FROM assistant_response_observations WHERE question_id=q.id)
           WHERE q.id<>?''',(qid,)).fetchall()
-    from technical_catalog import evidence
+    from technical_catalog import evidence, load
     with store.connect() as con:
         current=con.execute('SELECT facts,title FROM questions WHERE id=?',(qid,)).fetchone()
     technical=evidence(store,item_id,json.loads(current['facts']) if current else {})
@@ -107,13 +107,21 @@ def retrieve(store, qid, item_id, question, limit=8):
         size=len(json.dumps(e,ensure_ascii=False))
         if size<=budget: bounded.append(e);budget-=size
     evidence=bounded
+    # Alternatives are catalog products, never an implicit identity or live offer.
+    catalog=load()
+    alternatives=[{'id':'catalog:'+v['id'],'authority':'owner_catalog_alternative',
+                   'source':catalog['source'],
+                   'value':{**{k:value for k,value in family.items() if k!='variants'},**v,'family':family['id']}}
+                  for family in catalog['families'] for v in family['variants']]
+    from assistant_reasoning import reasoning_context
+    reasoning=reasoning_context(question, alternatives, technical)
     bounded=[]
     for e in examples:
         size=len(json.dumps(e,ensure_ascii=False))
         if size<=budget:bounded.append(e);budget-=size
     examples=bounded
     return {'publication':{'item_id':item_id,'title':current['title'] if current else ''},
-            'knowledge':evidence,'examples':examples,'history_scanned':len(rows),'catalog':technical,
+            'knowledge':evidence,'catalog_alternatives':alternatives,'reasoning':reasoning,'examples':examples,'history_scanned':len(rows),'catalog':technical,
             'warnings':technical['warnings']+['Las respuestas históricas no confirman stock, precios ni condiciones vigentes.',
                         'Ante contradicciones técnicas, pedir validación; nunca elegir un valor por mayoría.']}
 
