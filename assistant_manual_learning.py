@@ -55,6 +55,8 @@ def observe(con,q,answer,status='ANSWERED',source='API oficial Mercado Libre',pu
     generated=con.execute("SELECT state FROM assistant_drafts WHERE question_id=?",(q['id'],)).fetchone() if drafts_exist else None
     # Do not call a deterministic fallback an AI suggestion in comparison reports.
     suggestion=(q['edited'] or q['original']) if (generated and generated['state']=='GENERATED') or q['approved'] or q['edited'] else ''
+    if published_at:
+        con.execute('UPDATE questions SET external_answer_created=? WHERE id=?',(published_at,q['id']))
     stamp=datetime.now(timezone.utc).isoformat();digest=hashlib.sha256(answer.encode('utf-8')).hexdigest()
     inserted=con.execute('INSERT OR IGNORE INTO assistant_response_observations(question_id,item_id,answer_hash,answer_text,suggested_text,suggestion_version,origin,source,published_at,observed_at,comparison) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                 (q['id'],q['item_id'],digest,answer,suggestion,q['version'],origin,source,published_at,stamp,json.dumps(comparison(suggestion,answer),ensure_ascii=False))).rowcount

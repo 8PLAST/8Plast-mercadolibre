@@ -31,18 +31,35 @@ def main():
     store=Snapshot(con)
     from assistant_knowledge import initialize
     initialize(store)
+    for name in ('buyer_id','external_answer_created','external_created'):
+        if name not in {r[1] for r in con.execute('PRAGMA table_info(questions)')}:
+            con.execute(f'ALTER TABLE questions ADD COLUMN {name} TEXT')
+    con.commit()
     rows=con.execute("SELECT * FROM questions WHERE external_answer IS NOT NULL AND trim(external_answer)<>'' ORDER BY updated DESC LIMIT ?",(max(1,min(100,args.limit)),)).fetchall()
     for q in rows:
-        context=retrieve(store,q['id'],q['item_id'],q['question'])
+        isolated=sqlite3.connect(':memory:');con.backup(isolated);isolated.row_factory=sqlite3.Row
+        isolated_store=Snapshot(isolated)
+        from assistant_conversation import blind_snapshot
+        try:
+            blind_snapshot(isolated_store,q['id'])
+        except ValueError as exc:
+            print(json.dumps({'question_id':q['id'],'skipped':str(exc)},ensure_ascii=False))
+            isolated.close()
+            continue
+        context=retrieve(isolated_store,q['id'],q['item_id'],q['question'])
         result={'question_id':q['id'],'item_id':q['item_id'],'question':q['question'],
                 'published_answer':q['external_answer'],'context':context,'live':args.live}
         if args.live:
             try:
-                answer,used,warnings,meta=ai_draft(q['question'],json.loads(q['facts']),context)
+                facts=json.loads(q['facts'])
+                if context.get('catalog',{}).get('identity_confirmed'):
+                    facts={k:v for k,v in facts.items() if k in ('unidades_pack','presentacion')}
+                answer,used,warnings,meta=ai_draft(q['question'],facts,context)
                 result.update(suggested=answer,warnings=warnings,meta=meta)
             except ServiceFailure as exc:result['error']=exc.code
         else:result['note']='Solo recuperación. No es una respuesta generada por IA.'
         print(json.dumps(result,ensure_ascii=False))
+        isolated.close()
     con.close()
 
 
