@@ -124,8 +124,7 @@ def retrieve(store, qid, item_id, question, limit=8):
     thread=conversation(store,qid)
     return {'conversation':thread,'publication':{'item_id':item_id,'title':current['title'] if current else ''},
             'knowledge':evidence,'catalog_alternatives':alternatives,'reasoning':reasoning,'examples':examples,'history_scanned':len(rows),'catalog':technical,
-            'warnings':technical['warnings']+['Las respuestas históricas no confirman stock, precios ni condiciones vigentes.',
-                        'Ante contradicciones técnicas, pedir validación; nunca elegir un valor por mayoría.']}
+            'warnings':technical['warnings']}
 
 
 def metrics(store):

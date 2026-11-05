@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 import os
 
-from assistant_reasoning import reasoning_context
+from assistant_reasoning import reasoning_context, verified_geometry_answer
 from technical_catalog import load
 
 
@@ -33,6 +33,23 @@ class GeometryTests(unittest.TestCase):
         technical = {'identity_confirmed': True, 'knowledge': [{'value': {'family': 'consorcio_green'}}]}
         result = reasoning_context('Tacho de boca rectangular de 40x38 cm y 57cm de alto', self.alternatives, technical)
         self.assertTrue(all('consorcio_green' in option['evidence_id'] for option in result[0]['value']['options']))
+
+    def test_verified_formula_and_no_stock_promise(self):
+        q='Tacho de boca rectangular de 40x38 cm y 57cm de alto: que tamaño de bolsa necesito?'
+        entries=reasoning_context(q,self.alternatives,{})
+        answer,ids=verified_geometry_answer(q,{'reasoning':entries})
+        self.assertIn('40 + 38 = 78', answer)
+        self.assertIn('90×120', answer)
+        self.assertNotIn('doble', answer)
+        self.assertNotIn('stock', answer)
+        self.assertIn('calculation:rectangular_bin',ids)
+
+    def test_does_not_replace_mixed_questions_or_objections(self):
+        q='Tacho de boca rectangular de 40x38 cm y 57cm de alto: que tamaño de bolsa necesito?'
+        ctx={'reasoning':reasoning_context(q,self.alternatives,{})}
+        self.assertIsNone(verified_geometry_answer(q+' Y el precio?',ctx))
+        self.assertIsNone(verified_geometry_answer('No sobra largo? Dialogo original: '+q,ctx))
+        self.assertIsNone(verified_geometry_answer(q,{**ctx,'catalog':{'warnings':['Discrepancia medida']}}))
 
 
 class RetrievalTests(unittest.TestCase):

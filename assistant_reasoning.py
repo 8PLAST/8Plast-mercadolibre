@@ -3,6 +3,37 @@ import re
 import unicodedata
 
 
+def verified_geometry_answer(question, context):
+    """Render verified numbers for a single-purpose bin-sizing request.
+
+    The language model must not turn a correct calculation into a false formula.
+    Mixed questions and follow-ups retain their model draft for human review.
+    """
+    text = unicodedata.normalize('NFKD', question.lower()).encode('ascii','ignore').decode()
+    if (not re.search(r'que\s+(?:tamano|medida)\s+de\s+bolsa', text)
+            or re.search(r'dialogo original|sobr|precio|stock|envio|entrega|micron|resist|certific|alimento|\bkg\b|\bkilo', text)
+            or context.get('catalog',{}).get('warnings')):
+        return None
+    calc = next((e for e in context.get('reasoning',[]) if e['id']=='calculation:rectangular_bin'), None)
+    if not calc or not calc['value']['recommended']:
+        return None
+    value=calc['value']; chosen=value['recommended']
+    number=lambda x: format(x, 'g').replace('.',',')
+    a,b=value['mouth_cm']
+    answer=(f"¡Hola! Te recomendamos la bolsa de {number(chosen['width_cm'])}×{number(chosen['length_cm'])} cm. "
+            f"La boca de tu tacho necesita al menos {number(a)} + {number(b)} = "
+            f"{number(value['minimum_flat_width_cm'])} cm de ancho de bolsa aplanada, sin margen. ")
+    tight=next((x for x in value['options'] if x['fit']=='ajustado'),None)
+    ids=[calc['id'],chosen['evidence_id']]
+    if tight:
+        answer+=(f"La de {number(tight['width_cm'])}×{number(tight['length_cm'])} cm quedaría ajustada de boca; "
+                 f"la de {number(chosen['width_cm'])} cm de ancho te da más holgura. ")
+        ids.append(tight['evidence_id'])
+    if chosen['length_cm']>value['estimated_length_cm']+10:
+        answer+='De largo te va a sobrar y podés doblar el excedente sobre el borde. '
+    return answer+'¡Saludos, 8Plast!',ids
+
+
 def reasoning_context(question, alternatives, technical):
     text = unicodedata.normalize('NFKD', question.lower().replace('×','x')).encode('ascii', 'ignore').decode()
     if not re.search(r'\b(tacho|cesto|contenedor)\b', text):

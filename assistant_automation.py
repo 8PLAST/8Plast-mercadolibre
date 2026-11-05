@@ -206,9 +206,15 @@ def ai_draft(question, facts, context=None):
         allowed={('attribute:'+k) for k in facts} | {e['id'] for e in context['knowledge']+context['examples']+context.get('catalog_alternatives',[])+context.get('reasoning',[])+context.get('conversation',[])}
         if not answer or len(answer)>2000 or not isinstance(ids,list) or any(x not in allowed for x in ids): raise ValueError()
         if not isinstance(warnings,list) or any(not isinstance(x,str) for x in warnings): raise ValueError()
+        from assistant_reasoning import verified_geometry_answer
+        verified=verified_geometry_answer(question,context)
+        if verified:
+            answer,ids=verified
+            if any(x not in allowed for x in ids):raise ValueError()
+            warnings=[]
         used={k:v for k,v in facts.items() if 'attribute:'+k in ids}
         if any(x.startswith('history:') for x in ids): warnings.append('Verificar vigencia de los antecedentes históricos utilizados.')
-        return answer,used,warnings,{'usage':response.get('usage',{}),'evidence_ids':ids,'custom_request':result.get('custom_request')}
+        return answer,used,warnings,{'usage':response.get('usage',{}),'evidence_ids':ids,'custom_request':result.get('custom_request'),'calculation_checked':bool(verified)}
     except (KeyError,ValueError,TypeError,AttributeError): raise ServiceFailure('AI_INVALID_RESPONSE') from None
 
 
