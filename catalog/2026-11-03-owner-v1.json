@@ -17,6 +17,7 @@
     "No inferir stock/precios/envíos de catálogo",
     "Rojas/amarillas 100 se calculan en 100 reales, nunca 80",
     "Leña: ancho ya incluye fuelle",
+    "Todas las bolsas de consorcio de 8Plast son con fuelle, en todas las medidas y colores. Confirmado por Lucas el 2026-11-12. No ofrecer versión sin fuelle sin confirmación expresa",
     "Todas las bolsas cristal son vírgenes",
     "Rollos: validar variante completa, material y metros; 50 cm solo 70 mic y 100 m confirmados"
   ],
@@ -24,6 +25,9 @@
     {
       "id": "consorcio_black",
       "name": "Bolsas negras de consorcio",
+      "gusset": true,
+      "construction": "Con fuelle en todas las medidas",
+      "gusset_confirmed_date": "2026-11-12",
       "kind": "bags",
       "material": "black_recovered",
       "uses": [
@@ -82,6 +86,9 @@
     {
       "id": "consorcio_green",
       "name": "Bolsas verdes de consorcio",
+      "gusset": true,
+      "construction": "Con fuelle en todas las medidas",
+      "gusset_confirmed_date": "2026-11-12",
       "kind": "bags",
       "material": "green",
       "uses": [
