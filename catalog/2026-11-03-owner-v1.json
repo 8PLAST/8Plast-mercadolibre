@@ -475,6 +475,34 @@
           "guaranteed": false,
           "depends_on": "Tipo de leña, humedad y tamaño de los trozos",
           "scope": "Solo bolsa para leña 40x60 cm con fuelle; no trasladar a otras medidas o productos. Referencia aproximada de capacidad, no garantía de resistencia. No confirma espesor ni identidad de publicación."
+        },
+        {
+          "width_cm": 40,
+          "length_cm": 70,
+          "gusset": true,
+          "range_kg": [
+            8,
+            10
+          ],
+          "source": "Confirmado por Lucas Gorostiaga el 2026-11-16",
+          "tested": false,
+          "guaranteed": false,
+          "depends_on": "Tipo de leña, humedad y tamaño de los trozos",
+          "scope": "Solo bolsa para leña 40x70 cm con fuelle; no trasladar a otras medidas o productos. Referencia aproximada de capacidad, no garantía de resistencia. No confirma espesor ni identidad de publicación."
+        },
+        {
+          "width_cm": 50,
+          "length_cm": 80,
+          "gusset": true,
+          "range_kg": [
+            10,
+            15
+          ],
+          "source": "Confirmado por Lucas Gorostiaga el 2026-11-16",
+          "tested": false,
+          "guaranteed": false,
+          "depends_on": "Tipo de leña, humedad y tamaño de los trozos",
+          "scope": "Solo bolsa para leña 50x80 cm con fuelle; no trasladar a otras medidas o productos. Referencia aproximada de capacidad, no garantía de resistencia. No confirma espesor ni identidad de publicación."
         }
       ],
       "gusset": true,
@@ -482,13 +510,13 @@
       "load_reference": {
         "variant": "firewood-50x80-60",
         "range_kg": [
-          12,
+          10,
           15
         ],
-        "source": "Usos informados por clientes según propietario",
+        "source": "Confirmado por Lucas Gorostiaga el 2026-11-16",
         "tested": false,
         "guaranteed": false,
-        "depends_on": "Características de la leña"
+        "depends_on": "Tipo de leña, humedad y tamaño de los trozos"
       },
       "commercial": "Resistencia, calidad y practicidad",
       "virgin": false
