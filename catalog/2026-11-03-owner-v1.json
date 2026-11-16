@@ -461,6 +461,22 @@
         }
       ],
       "load_guarantee_kg": null,
+      "size_specific_load_references": [
+        {
+          "width_cm": 40,
+          "length_cm": 60,
+          "gusset": true,
+          "range_kg": [
+            6,
+            8
+          ],
+          "source": "Confirmado por Lucas Gorostiaga el 2026-11-16",
+          "tested": false,
+          "guaranteed": false,
+          "depends_on": "Tipo de leña, humedad y tamaño de los trozos",
+          "scope": "Solo bolsa para leña 40x60 cm con fuelle; no trasladar a otras medidas o productos. Referencia aproximada de capacidad, no garantía de resistencia. No confirma espesor ni identidad de publicación."
+        }
+      ],
       "gusset": true,
       "width_includes_gusset": true,
       "load_reference": {
