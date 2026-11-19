@@ -173,8 +173,33 @@ def normalized(text):
     return ''.join(c for c in unicodedata.normalize('NFD', text.lower()) if unicodedata.category(c) != 'Mn')
 
 
+PRINTING_REPLY = '¡Hola! Gracias por consultar. Por el momento no estamos haciendo trabajos de impresión en bolsas. ¡Saludos! 8PLAST_'
+REPLY_SIGNATURE = '8PLAST_'
+
+
+def printing_reply(question):
+    q = normalized(question)
+    if re.search(r'\b(?:impresion(?:es)?|imprim\w*|serigraf\w*|flexograf\w*|estamp\w*)\b', q):
+        return PRINTING_REPLY
+    if re.search(r'\b(?:logos?|logotipos?|datos de contacto)\b', q) and re.search(
+        r'\b(?:personaliz\w*|poner|agregar|estamp\w*|con|hacen|colocar)\b', q
+    ):
+        return PRINTING_REPLY
+    return None
+
+
+def sign_reply(answer):
+    answer = re.sub(r'(?:\s*[-–—]?\s*8plast_)+[.!]?\s*$', '', answer.strip(), flags=re.I)
+    answer = answer.strip()
+    if not re.search(r'(?:saludos|gracias)[!.]?[¡!]?$', answer, flags=re.I):
+        answer = f'{answer} ¡Saludos!'.strip()
+    return f'{answer} {REPLY_SIGNATURE}'
+
+
 def suggest(question, facts):
     """Conservative, deterministic drafting until an AI provider is configured."""
+    if reply := printing_reply(question):
+        return reply, {}, []
     q = normalized(question)
     topics = {
         'presentacion': ('rollo', 'suelta', 'presentacion', 'tubo'),
@@ -197,7 +222,7 @@ def suggest(question, facts):
     answer = 'Hola. ' + ' '.join(f'{labels[k]}: {v}.' for k, v in used.items())
     if missing:
         answer += ' Falta verificar: ' + ', '.join(labels.get(k, {'usos': 'aptitud para el uso consultado', 'logistica': 'disponibilidad y condiciones de entrega vigentes'}.get(k, k)) for k in missing) + '.'
-    return answer.strip(), used, missing
+    return sign_reply(answer), used, missing
 
 
 class ReviewStore:
@@ -282,6 +307,11 @@ class ReviewStore:
                         con.execute("UPDATE assistant_publications_outbox SET state=CASE WHEN answer=? THEN 'MATCHED_REMOTE' ELSE 'EXTERNAL_ANSWER' END,error=NULL,updated=? WHERE question_id=? AND state IN ('SENDING','UNKNOWN','FAILED')",(str(answer),now(),values[0]))
                     con.execute('UPDATE questions SET external_status=?, external_answer=?, updated=?, external_created=? WHERE id=?',
                         (values[4], values[5], values[-1],str(q.get('date_created','')), values[0]))
+                    if (draft == PRINTING_REPLY and existing['original'] != draft
+                        and values[4] == 'UNANSWERED' and existing['status'] == 'PENDIENTE'
+                        and existing['edited'] is None and existing['approved'] is None):
+                        con.execute("UPDATE questions SET original=?, used='{}', missing='[]', version=version+1 WHERE id=?",
+                                    (draft, values[0]))
                     if facts != json.loads(existing['facts']) or values[2] != existing['title']:
                         con.execute('UPDATE questions SET facts=?,title=? WHERE id=?',(json.dumps(facts),values[2],values[0]))
                         if str(q.get('status'))=='UNANSWERED' and existing['status']=='PENDIENTE' and not existing['edited'] and not existing['approved']:

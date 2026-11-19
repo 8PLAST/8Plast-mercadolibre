@@ -104,7 +104,7 @@ class AutomationTests(unittest.TestCase):
         with patch.dict(os.environ,{'OPENAI_API_KEY':'secret-test'}),patch.object(auto,'post_json',return_value=result) as api:
             auto.draft_question(self.store,'1')
         q = self.read('questions')[0]
-        self.assertEqual(q['original'],'Hola. Unidades por pack: 50.')
+        self.assertEqual(q['original'],'Hola. Unidades por pack: 50. ¡Saludos! 8PLAST_')
         self.assertEqual(api.call_args[0][1]['store'],False)
         self.store.decide('1','EDITADA','Mi corrección',q['version'])
         with patch.object(auto,'ai_draft',side_effect=AssertionError('no llamada')):
