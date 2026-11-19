@@ -8,6 +8,7 @@ import urllib.error
 import socket
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from flask import Blueprint, abort, flash, redirect, render_template, request
 
@@ -188,6 +189,48 @@ def printing_reply(question):
     return None
 
 
+def tubular_roll_reply(question):
+    q = normalized(question)
+    if not re.search(r'\b(?:rollos?|bobinas?|mangas?|tubular)\b', q):
+        return None
+
+    number = r'(\d+(?:[.,]\d+)?)'
+    separator = r'\s*[x×]\s*'
+    dimensions = re.search(
+        rf'\b(cajas?|bolsas?)\s+(?:de\s+)?{number}{separator}{number}'
+        rf'(?:{separator}{number})?\s*(cm|mm|m)?\b', q
+    )
+    if not dimensions:
+        return None
+    object_type, first, second, third, unit = dimensions.groups()
+    factor = {'mm': Decimal('0.1'), 'm': Decimal(100)}.get(unit, Decimal(1))
+    sizes = [Decimal(value.replace(',', '.')) * factor for value in (first, second, third) if value]
+    if min(sizes) <= 0:
+        return None
+
+    if object_type.startswith('caja') and third:
+        # A flat tube's width is half its open perimeter. The last dimension is the height.
+        minimum = sizes[0] + sizes[1]
+        from technical_catalog import load
+        widths = sorted({variant['width_cm'] for family in load()['families']
+                         if family['kind'] == 'rolls' for variant in family['variants']})
+        width = next((width for width in widths if width > minimum), None)
+        answer = (f'¡Hola! Para usar la bolsa como revestimiento interior de la caja, '
+                  f'el ancho plano mínimo del tubo es de {minimum.normalize():f} cm '
+                  f'(largo más ancho de la base). ')
+        if width is None:
+            return sign_reply(answer + 'Consultanos por esta publicación si necesitás una medida especial.')
+        return sign_reply(answer + f'Te recomendamos un rollo tubular de {width} cm de ancho '
+                          'para tener margen al acomodarlo. Cortá cada tramo y sellá un extremo para formar la bolsa.')
+
+    if object_type.startswith('bolsa') and not third and not re.search(r'\bcajas?\b', q):
+        return sign_reply(f'¡Hola! Si la medida de la bolsa ya está dada como ancho × largo en plano, '
+                          f'necesitás un rollo tubular de {sizes[0].normalize():f} cm de ancho. '
+                          f'Dejá margen para el sellado al cortar los tramos para que la bolsa terminada '
+                          f'tenga {sizes[1].normalize():f} cm de largo.')
+    return None
+
+
 def sign_reply(answer):
     answer = re.sub(r'(?:\s*[-–—]?\s*8plast_)+[.!]?\s*$', '', answer.strip(), flags=re.I)
     answer = answer.strip()
@@ -198,7 +241,7 @@ def sign_reply(answer):
 
 def suggest(question, facts):
     """Conservative, deterministic drafting until an AI provider is configured."""
-    if reply := printing_reply(question):
+    if reply := printing_reply(question) or tubular_roll_reply(question):
         return reply, {}, []
     q = normalized(question)
     topics = {

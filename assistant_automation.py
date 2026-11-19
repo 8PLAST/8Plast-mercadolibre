@@ -16,7 +16,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from assistant_center import (
-    now, fetch_questions, QueryFailure, suggest, ReadOnlyMercadoLibre, printing_reply, sign_reply,
+    now, fetch_questions, QueryFailure, suggest, ReadOnlyMercadoLibre, printing_reply, sign_reply, tubular_roll_reply,
 )
 
 PANEL = 'https://8plast-mercadolibre-webhook-production.up.railway.app/asistentes'
@@ -148,7 +148,7 @@ def check_pairing(store):
 
 
 def ai_draft(question, facts, context=None):
-    if reply := printing_reply(question):
+    if reply := printing_reply(question) or tubular_roll_reply(question):
         return reply, {}, [], {'usage': {}, 'evidence_ids': []}
     key = os.getenv('OPENAI_API_KEY','').strip()
     if not key: raise ServiceFailure('AI_NOT_CONFIGURED')
