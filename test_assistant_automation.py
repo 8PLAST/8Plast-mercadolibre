@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from assistant_center import ReviewStore, QueryFailure
+from assistant_center import ReviewStore, QueryFailure, suggest
 import assistant_automation as auto
 
 
@@ -26,6 +26,24 @@ class AutomationTests(unittest.TestCase):
 
     def read(self, table):
         with self.store.connect() as con: return [dict(r) for r in con.execute('SELECT * FROM '+table)]
+
+    def test_recommends_tube_width_from_box_base_without_ai(self):
+        question = ('Buen día, necesito cortar bolsas para que entren en una caja de '
+                    '40x30x15, ¿qué medida de rollo me recomiendan?')
+        facts = {'medida': '60 cm'}
+        with patch.dict(os.environ, {'OPENAI_API_KEY': ''}):
+            answer, _, warnings, _ = auto.ai_draft(question, facts)
+        self.assertIn('mínimo del tubo es de 70 cm', answer)
+        self.assertIn('rollo tubular de 80 cm', answer)
+        self.assertTrue(answer.endswith('¡Saludos! 8PLAST_'))
+        self.assertEqual(warnings, [])
+        self.assertEqual(suggest(question, facts)[0], answer)
+
+    def test_uses_bag_flat_width_directly_without_ai(self):
+        with patch.dict(os.environ, {'OPENAI_API_KEY': ''}):
+            answer, *_ = auto.ai_draft('¿Qué rollo necesito para hacer bolsas de 30×40 cm?', {})
+        self.assertIn('rollo tubular de 30 cm de ancho', answer)
+        self.assertIn('40 cm de largo', answer)
 
     def test_baseline_silent_future_only_and_deduplicated_after_restart(self):
         with patch.object(auto,'fetch_questions',return_value=(self.payload(),[])), patch.object(auto,'now',return_value='2026-10-07T11:00:00+00:00'):
